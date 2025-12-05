@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Alkegen Scheduler v5.3 (Production Ready)</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="loginScreen" class="login-wrapper">
+    <div class="mb-8 text-center">
+        <div class="w-16 h-16 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg mx-auto mb-4">
+            <i class="fa-solid fa-industry text-white text-2xl"></i>
+        </div>
+        <h1 class="text-2xl font-bold text-slate-800">Alkegen Scheduler</h1>
+        <p class="text-slate-500 text-sm">Secure Production System v5.3</p>
+    </div>
+    <div class="login-box">
+        <div class="space-y-4">
+            <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Email</label>
+                <input type="email" id="email" class="w-full border border-slate-300 rounded p-2 text-sm" placeholder="email@alkegen.com">
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Password</label>
+                <input type="password" id="password" class="w-full border border-slate-300 rounded p-2 text-sm" placeholder="••••••••">
+            </div>
+            <button onclick="handleLogin()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded transition shadow-md">Sign In</button>
+            <p id="loginError" class="text-red-500 text-xs text-center hidden"></p>
+        </div>
+    </div>
+</div>
+
+<div id="mainApp" class="app-container hidden">
+    <header>
+        <div class="flex items-center gap-4">
+            <div class="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center shadow-md">
+                <i class="fa-solid fa-industry text-white"></i>
+            </div>
+            <div>
+                <h1 class="font-bold text-lg text-slate-800 leading-tight">Alkegen <span class="text-blue-600">Production</span></h1>
+                <div class="flex items-center gap-2 text-xs text-slate-500 font-medium">
+                    <span class="w-2 h-2 rounded-full bg-green-500"></span> <span id="userRoleBadge">Viewer</span> Mode
+                </div>
+            </div>
+        </div>
+
+        <nav class="nav-group">
+            <button onclick="switchView('gantt')" id="nav-gantt" class="nav-btn active"><i class="fa-solid fa-layer-group"></i>Schedule</button>
+            <button onclick="switchView('sequencing')" id="nav-sequencing" class="nav-btn"><i class="fa-solid fa-route"></i>Sequencing</button>
+            <button onclick="switchView('staffing')" id="nav-staffing" class="nav-btn"><i class="fa-solid fa-users"></i>Staffing</button>
+            <button onclick="switchView('rates')" id="nav-rates" class="nav-btn"><i class="fa-solid fa-sliders"></i>Rates</button>
+            <button onclick="switchView('kpi')" id="nav-kpi" class="nav-btn"><i class="fa-solid fa-chart-pie"></i>Analytics</button>
+            <button onclick="switchView('downtime')" id="nav-downtime" class="nav-btn"><i class="fa-solid fa-triangle-exclamation"></i>Downtime</button>
+        </nav>
+
+        <div class="flex items-center gap-3">
+            <span id="userEmailDisplay" class="text-xs text-slate-400 mr-2 font-mono"></span>
+            
+            <button onclick="showModal('uploadModal')" class="admin-only px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-lg shadow-sm transition flex items-center gap-2">
+                <i class="fa-solid fa-cloud-arrow-up"></i> Import Data
+            </button>
+            
+            <button onclick="exportExcel()" class="w-9 h-9 flex items-center justify-center text-green-600 hover:bg-green-50 rounded-lg border border-green-200 transition" title="Export Excel">
+                <i class="fa-solid fa-file-excel text-lg"></i>
+            </button>
+
+            <button onclick="handleLogout()" class="w-9 h-9 flex items-center justify-center text-slate-400 hover:bg-slate-100 rounded-lg border border-slate-200 transition" title="Logout">
+                <i class="fa-solid fa-right-from-bracket"></i>
+            </button>
+        </div>
+    </header>
+
+    <div id="view-gantt" class="flex-1 flex flex-col relative fade-in overflow-hidden">
+        <div class="h-14 border-b border-slate-200 bg-white flex items-center justify-between px-6 flex-shrink-0 z-40">
+            <div class="flex items-center gap-6">
+                <div class="flex flex-col">
+                    <label class="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Start Date</label>
+                    <input type="date" id="simDate" class="text-xs border-none bg-transparent font-bold text-slate-700 p-0 focus:ring-0 cursor-pointer hover:text-blue-600 transition" onchange="runEngine()">
+                </div>
+                <div class="h-8 w-px bg-slate-200"></div>
+                <div class="flex items-center gap-3 group relative">
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="campaignMode" class="sr-only peer" checked onchange="runEngine()">
+                        <div class="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                        <span class="ml-2 text-xs font-bold text-slate-600 group-hover:text-slate-900 transition">Campaign Mode (Fiber)</span>
+                    </label>
+                </div>
+                <div class="h-8 w-px bg-slate-200"></div>
+                <div class="text-xs font-mono">
+                    <span class="text-slate-500">ENGINE: </span>
+                    <span id="engineStatus" class="text-green-600 font-bold">READY</span>
+                </div>
+            </div>
+            <div class="flex items-center gap-4">
+                <div class="flex items-center bg-slate-100 rounded-lg p-1 border border-slate-200">
+                    <button onclick="changeZoom(-10)" class="w-7 h-7 flex items-center justify-center text-slate-500 hover:text-blue-600 hover:bg-white rounded transition"><i class="fa-solid fa-minus"></i></button>
+                    <span class="px-2 text-xs font-mono text-slate-500 select-none">ZOOM</span>
+                    <button onclick="changeZoom(10)" class="w-7 h-7 flex items-center justify-center text-slate-500 hover:text-blue-600 hover:bg-white rounded transition"><i class="fa-solid fa-plus"></i></button>
+                </div>
+            </div>
+        </div>
+
+        <div class="gantt-header-row">
+            <div class="sidebar-header">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 80px">Status</th>
+                            <th style="width: 90px">Order</th>
+                            <th style="width: 130px">Felt Code</th>
+                            <th style="width: 100px">Fiber</th>
+                            <th style="width: 100px">Status</th>
+                            <th style="width: 50px; text-align: right">Bal</th>
+                        </tr>
+                    </thead>
+                </table>
+            </div>
+            <div class="timeline-header-wrapper" id="timelineHeaderWrapper">
+                <div id="timelineHeader" class="timeline-header"></div>
+            </div>
+        </div>
+
+        <div class="gantt-wrapper">
+            <div class="gantt-scroll-container" id="mainScroll">
+                <div class="gantt-sidebar">
+                    <table class="data-table">
+                        <tbody id="taskTableBody"></tbody>
+                    </table>
+                </div>
+                <div class="gantt-chart" id="ganttChart">
+                    <div id="todayLine" style="position: absolute; top: 0; bottom: 0; width: 1px; background: #ef4444; z-index: 40; pointer-events: none; border-left: 1px dashed #ef4444;"></div>
+                    <div id="timelineBody" class="pb-24"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="view-sequencing" class="flex-1 hidden bg-white p-8 fade-in overflow-auto">
+        <div class="max-w-7xl mx-auto">
+            <div class="flex justify-between items-end mb-6">
+                <div>
+                    <h2 class="text-2xl font-bold text-slate-800">Dynamic Routing Graph</h2>
+                    <p class="text-sm text-slate-500">Based on Digital Schedule Sheet4. Routes are parsed automatically.</p>
+                </div>
+            </div>
+            <div class="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
+                <table class="w-full text-sm text-left text-slate-600">
+                    <thead class="bg-slate-50 text-slate-500 font-bold border-b border-slate-200">
+                        <tr>
+                            <th class="p-4">Felt Code</th>
+                            <th class="p-4">Route Steps (Order -> Machine Pool)</th>
+                            <th class="p-4 w-20 text-center">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="sequencingTableBody" class="divide-y divide-slate-100"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div id="view-staffing" class="flex-1 hidden bg-white p-8 fade-in overflow-auto">
+        <div class="max-w-5xl mx-auto">
+            <div class="flex justify-between items-end mb-6">
+                <div>
+                    <h2 class="text-2xl font-bold text-slate-800">Machine Staffing</h2>
+                    <p class="text-sm text-slate-500">Control availability per machine. Unchecked shifts are treated as downtime.</p>
+                </div>
+                <button onclick="runEngine()" class="admin-only px-4 py-2 bg-green-600 text-white font-bold rounded shadow hover:bg-green-700">Apply & Re-Schedule</button>
+            </div>
+            <div class="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
+                <table class="w-full text-sm text-left text-slate-600">
+                    <thead class="bg-slate-50 text-slate-500 font-bold border-b border-slate-200">
+                        <tr>
+                            <th class="p-4">Specific Machine</th>
+                            <th class="p-4 text-center">Day (08:00 - 16:00)</th>
+                            <th class="p-4 text-center">Swing (16:00 - 00:00)</th>
+                            <th class="p-4 text-center">Night (00:00 - 08:00)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="staffingTableBody" class="divide-y divide-slate-100"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div id="view-rates" class="flex-1 hidden bg-white p-8 fade-in overflow-auto">
+        <div class="max-w-6xl mx-auto">
+            <div class="flex justify-between items-end mb-6">
+                <h2 class="text-2xl font-bold text-slate-800">Rates & Changeovers</h2>
+                <div class="flex gap-3">
+                    <div class="bg-slate-50 p-2 rounded-lg border border-slate-200 flex items-center gap-3">
+                        <span class="text-xs font-bold text-slate-500 uppercase ml-2">Setup Penalty</span>
+                        <input type="number" id="setupPenalty" value="4" class="w-16 bg-white border border-slate-300 text-slate-700 rounded px-2 py-1 text-center font-mono text-sm" onchange="runEngine()">
+                        <span class="text-xs text-slate-500 mr-2">hours</span>
+                    </div>
+                    <div class="flex gap-3 admin-only">
+                        <button onclick="document.getElementById('massRateModal').style.display='flex'" class="px-4 py-2 bg-slate-100 border border-slate-300 text-slate-700 font-bold rounded hover:bg-white transition">Mass Update</button>
+                        <button onclick="addNewRateRow()" class="px-4 py-2 bg-blue-600 text-white font-bold rounded shadow hover:bg-blue-700">+ Add Rate</button>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-white rounded-lg border border-slate-200 overflow-hidden shadow-sm">
+                <table class="w-full text-sm text-left text-slate-600">
+                    <thead class="bg-slate-50 text-slate-500 font-bold border-b border-slate-200">
+                        <tr>
+                            <th class="p-4 w-1/3">Felt Code</th>
+                            <th class="p-4 text-right">Carding (yds/hr)</th>
+                            <th class="p-4 text-right">Finishing (yds/hr)</th>
+                            <th class="p-4 text-right">QC (yds/hr)</th>
+                            <th class="p-4 w-20 text-center">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="ratesTableBody" class="divide-y divide-slate-100"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div id="view-kpi" class="flex-1 hidden bg-white p-8 fade-in overflow-auto">
+        <div class="max-w-7xl mx-auto space-y-8">
+            <h2 class="text-2xl font-bold text-slate-800">Operational Analytics</h2>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm"><div class="text-xs font-bold text-slate-400 uppercase">Throughput</div><div class="text-3xl font-bold text-slate-800 mt-2" id="kpiYds">0</div></div>
+                <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm"><div class="text-xs font-bold text-slate-400 uppercase">Revenue</div><div class="text-3xl font-bold text-green-600 mt-2" id="kpiRev">$0</div></div>
+                <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm"><div class="text-xs font-bold text-slate-400 uppercase">Late Value</div><div class="text-3xl font-bold text-red-600 mt-2" id="kpiLate">$0</div></div>
+            </div>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 h-96">
+                <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col">
+                    <h3 class="text-sm font-bold text-slate-600 mb-6">Machine Load Balance</h3>
+                    <div class="flex-grow relative"><canvas id="chartLoad"></canvas></div>
+                </div>
+                <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col">
+                    <h3 class="text-sm font-bold text-slate-600 mb-6">Revenue Forecast</h3>
+                    <div class="flex-grow relative"><canvas id="chartRev"></canvas></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="view-downtime" class="flex-1 hidden bg-white p-8 fade-in overflow-auto">
+         <div class="max-w-4xl mx-auto">
+            <h2 class="text-2xl font-bold text-slate-800 mb-6">Planned Downtime</h2>
+            <div class="bg-white p-6 rounded-xl border border-slate-200 mb-8 shadow-sm grid grid-cols-1 md:grid-cols-4 gap-4 items-end admin-only">
+                <select id="dtMachine" class="w-full bg-slate-50 border border-slate-300 rounded p-2 text-sm"></select>
+                <input type="datetime-local" id="dtStart" class="w-full bg-slate-50 border border-slate-300 rounded p-2 text-sm">
+                <input type="datetime-local" id="dtEnd" class="w-full bg-slate-50 border border-slate-300 rounded p-2 text-sm">
+                <button onclick="addDowntime()" class="bg-red-600 text-white font-bold py-2 rounded text-sm shadow">Add Block</button>
+            </div>
+            <div class="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+                <table class="w-full text-sm text-left text-slate-600"><tbody id="dtBody" class="divide-y divide-slate-100"></tbody></table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="uploadModal" class="modal-bg">
+    <div class="modal-content">
+        <h2 class="text-xl font-bold mb-6 text-slate-800 border-b border-slate-200 pb-2">Import Data</h2>
+        <div class="space-y-4">
+            <div class="border border-dashed border-slate-300 rounded-lg p-6 hover:bg-slate-50 transition cursor-pointer relative text-center group">
+                <i class="fa-solid fa-microchip text-2xl text-blue-500 mb-2"></i>
+                <div class="font-bold text-slate-700">1. Load Rates</div>
+                <div class="text-xs text-slate-500" id="rateStatus">Rates.xlsx</div>
+                <input type="file" class="absolute inset-0 opacity-0 cursor-pointer" onchange="handleRateUpload(this)">
+            </div>
+            <div class="border border-dashed border-slate-300 rounded-lg p-6 hover:bg-slate-50 transition cursor-pointer relative text-center group">
+                <i class="fa-solid fa-file-csv text-2xl text-green-500 mb-2"></i>
+                <div class="font-bold text-slate-700">2. Load Orders</div>
+                <div class="text-xs text-slate-500" id="orderStatus">Open Orders.xlsx</div>
+                <input type="file" class="absolute inset-0 opacity-0 cursor-pointer" onchange="handleOrderUpload(this)">
+            </div>
+            <div class="border border-dashed border-slate-300 rounded-lg p-6 hover:bg-slate-50 transition cursor-pointer relative text-center group">
+                <i class="fa-solid fa-route text-2xl text-purple-500 mb-2"></i>
+                <div class="font-bold text-slate-700">3. Load Digital Schedule</div>
+                <div class="text-xs text-slate-500" id="routeStatus">Digital Schedule.xlsx</div>
+                <input type="file" class="absolute inset-0 opacity-0 cursor-pointer" onchange="handleRouteUpload(this)">
+            </div>
+        </div>
+        <div class="flex justify-end gap-3 mt-8">
+            <button onclick="document.getElementById('uploadModal').style.display='none'" class="px-4 py-2 text-slate-500 font-bold text-sm">Cancel</button>
+            <button onclick="runEngine()" class="px-6 py-2 bg-blue-600 text-white font-bold rounded-lg shadow-lg">Initialize</button>
+        </div>
+    </div>
+</div>
+
+<div id="editRouteModal" class="modal-bg">
+    <div class="modal-content w-[600px]">
+        <h2 class="text-lg font-bold text-slate-800 mb-4">Edit Routing: <span id="editRouteFelt" class="text-blue-600"></span></h2>
+        <div class="mb-4">
+            <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Define Flow (comma separated steps)</label>
+            <p class="text-xs text-slate-400 mb-2">Use "/" for machine options in a single step. <br>Example: <code>Card 1/Card 2, Bruckner 1, QC 1/QC 2</code></p>
+            <textarea id="editRouteString" class="w-full bg-slate-50 border border-slate-300 rounded p-3 text-sm font-mono h-32"></textarea>
+        </div>
+        <div class="flex justify-end gap-3">
+            <button onclick="document.getElementById('editRouteModal').style.display='none'" class="px-4 py-2 text-slate-500 font-bold text-sm">Cancel</button>
+            <button onclick="saveRouteEdit()" class="admin-only px-4 py-2 bg-blue-600 text-white font-bold rounded shadow hover:bg-blue-700">Save</button>
+        </div>
+    </div>
+</div>
+
+<div id="editOrderModal" class="modal-bg">
+    <div class="modal-content w-[500px]">
+        <h2 class="text-lg font-bold text-slate-800 mb-4">Edit Order <span id="editOrderId" class="text-blue-600"></span></h2>
+        <div class="grid grid-cols-2 gap-4 mb-4">
+            <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Balance (Qty)</label>
+                <input type="number" id="editQty" class="w-full bg-white border border-slate-300 text-slate-800 rounded p-2 text-sm">
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Felt Code</label>
+                <input type="text" id="editFelt" class="w-full bg-gray-100 border border-slate-300 text-slate-600 rounded p-2 text-sm" readonly>
+            </div>
+        </div>
+        
+        <div class="border-t border-slate-200 pt-4 mb-4">
+            <h3 class="text-xs font-bold text-slate-800 mb-2 uppercase">Force Specific Machines (Override Logic)</h3>
+            <div class="grid grid-cols-3 gap-3">
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-500 mb-1">Carding</label>
+                    <select id="forceCard" class="w-full bg-white border border-slate-300 text-slate-800 rounded p-2 text-xs">
+                        <option value="">Auto (Engine)</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-500 mb-1">Finishing</label>
+                    <select id="forceFin" class="w-full bg-white border border-slate-300 text-slate-800 rounded p-2 text-xs">
+                        <option value="">Auto (Engine)</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-500 mb-1">QC</label>
+                    <select id="forceQC" class="w-full bg-white border border-slate-300 text-slate-800 rounded p-2 text-xs">
+                        <option value="">Auto (Engine)</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-6 flex justify-end gap-3">
+            <button onclick="document.getElementById('editOrderModal').style.display='none'" class="px-4 py-2 text-slate-500 font-bold text-sm">Cancel</button>
+            <button onclick="saveOrderEdit()" class="admin-only px-4 py-2 bg-blue-600 text-white font-bold rounded shadow hover:bg-blue-700">Save & Re-Run</button>
+        </div>
+    </div>
+</div>
+
+<div id="editRateModal" class="modal-bg">
+    <div class="modal-content w-[400px]">
+        <h2 class="text-lg font-bold text-slate-800 mb-4">Edit Rate: <span id="editRateFelt" class="text-blue-600"></span></h2>
+        <div class="grid grid-cols-3 gap-3 mb-4">
+            <div><label class="text-[10px] font-bold text-slate-500">Card</label><input type="number" id="editRateCard" class="w-full border rounded p-2 text-sm"></div>
+            <div><label class="text-[10px] font-bold text-slate-500">Finishing</label><input type="number" id="editRateFin" class="w-full border rounded p-2 text-sm"></div>
+            <div><label class="text-[10px] font-bold text-slate-500">QC</label><input type="number" id="editRateQC" class="w-full border rounded p-2 text-sm"></div>
+        </div>
+        <div class="flex justify-end gap-3">
+            <button onclick="document.getElementById('editRateModal').style.display='none'" class="px-4 py-2 text-slate-500 text-sm font-bold">Cancel</button>
+            <button onclick="saveRateEdit()" class="admin-only px-4 py-2 bg-blue-600 text-white text-sm font-bold rounded">Save</button>
+        </div>
+    </div>
+</div>
+
+<div id="massRateModal" class="modal-bg">
+    <div class="modal-content w-[400px]">
+        <h2 class="text-lg font-bold text-slate-800 mb-4">Mass Update Rates</h2>
+        <div class="space-y-4">
+            <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Felt Code Contains</label>
+                <input type="text" id="massRateFilter" class="w-full bg-white border border-slate-300 rounded p-2 text-sm" placeholder="e.g. AX-14">
+            </div>
+            <div class="grid grid-cols-3 gap-2">
+                <div><label class="text-[10px]">Card Rate</label><input type="number" id="massRateCard" class="w-full border rounded p-1"></div>
+                <div><label class="text-[10px]">Fin Rate</label><input type="number" id="massRateFin" class="w-full border rounded p-1"></div>
+                <div><label class="text-[10px]">QC Rate</label><input type="number" id="massRateQC" class="w-full border rounded p-1"></div>
+            </div>
+        </div>
+        <div class="mt-6 flex justify-end gap-3">
+            <button onclick="document.getElementById('massRateModal').style.display='none'" class="px-4 py-2 text-slate-500 font-bold text-sm">Cancel</button>
+            <button onclick="applyMassRate()" class="admin-only px-4 py-2 bg-blue-600 text-white font-bold rounded">Apply</button>
+        </div>
+    </div>
+</div>
+
+<div id="tooltip" class="tooltip"></div>
+
+<script id="worker-script" type="text/plain">
+    self.onmessage = function(e) {
+        const { orders, rates, config, downtime, simStart, routes, staffing, overrides } = e.data;
+        const MACHINES = config.machines;
+        
+        let schedule = [];
+        let now = simStart || new Date().getTime();
+        let machineState = {};
+        let activeDowntime = [...downtime];
+
+        // 1. STAFFING DOWNTIME
+        for(let d=0; d<60; d++) {
+            const dayStart = now + (d * 86400000);
+            const midnight = new Date(dayStart).setHours(0,0,0,0);
+            Object.keys(staffing).forEach(machName => {
+                const avail = staffing[machName];
+                if(!avail) return;
+                if(!avail[0]) activeDowntime.push({ machine: machName, start: midnight + (8*3600000), end: midnight + (16*3600000), reason: 'Staffing' });
+                if(!avail[1]) activeDowntime.push({ machine: machName, start: midnight + (16*3600000), end: midnight + (24*3600000), reason: 'Staffing' });
+                if(!avail[2]) activeDowntime.push({ machine: machName, start: midnight, end: midnight + (8*3600000), reason: 'Staffing' });
+            });
+        }
+
+        // Init State
+        MACHINES.forEach(m => { machineState[m] = { time: now, lastFelt: null, lastFiber: null }; });
+
+        // 2. CAMPAIGN SORT (UPDATED: Fiber Type Priority)
+        let queue = [...orders];
+        if (config.campaign) {
+            queue.sort((a,b) => {
+                const fiberA = (a.fiber || '').toUpperCase();
+                const fiberB = (b.fiber || '').toUpperCase();
+                if(fiberA < fiberB) return -1;
+                if(fiberA > fiberB) return 1;
+                if (a.felt < b.felt) return -1;
+                if (a.felt > b.felt) return 1;
+                const dateA = a.rtsDate || 9999999999999;
+                const dateB = b.rtsDate || 9999999999999;
+                return dateA - dateB;
+            });
+        } else {
+            queue.sort((a,b) => a.rtsDate - b.rtsDate);
+        }
+
+        // 3. SCHEDULER
+        queue.forEach(ord => {
+            const r = rates[ord.felt] || Object.values(rates)[0] || {card:250, finish:700, qc:400};
+            
+            // WIP STATUS CHECK: If "Ready to Ship", "In Warehouse", "Completed" -> Do not schedule machine time.
+            const statusUpper = (ord.status || '').toUpperCase();
+            if(statusUpper.includes('READY TO SHIP') || statusUpper.includes('WAREHOUSE') || statusUpper.includes('INVOICED') || statusUpper.includes('SHIPPED')) {
+                // Just add to schedule for visibility, but with 0 duration/machine load
+                schedule.push({
+                    ...ord,
+                    allocations: [],
+                    card: {mach:'-', start:now, end:now},
+                    fin: {mach:'-', start:now, end:now},
+                    qc: {mach:'-', start:now, end:now},
+                    globalEnd: now,
+                    isLate: false
+                });
+                return; // SKIP SCHEDULING LOGIC
+            }
+
+            // DYNAMIC ROUTING
+            let routeSteps = routes[ord.felt];
+            if (!routeSteps || routeSteps.length === 0) {
+                 routeSteps = [
+                    { step: 1, pool: MACHINES.filter(m => m.includes('Card')) },
+                    { step: 2, pool: MACHINES.filter(m => m.includes('Bruckner') || m.includes('Kusters') || m.includes('Singer') || m.includes('Dilo')) },
+                    { step: 3, pool: MACHINES.filter(m => m.includes('QC')) }
+                 ];
+            }
+
+            // WIP STATUS LOGIC: Fast Forward
+            let startStepIndex = 0;
+            let initialReadyTime = now; // Always start scheduling from NOW (simStart)
+            
+            if(statusUpper.includes('WAITING BRUCKNER') || (statusUpper.includes('CARDING') && !statusUpper.includes('NOT'))) {
+                startStepIndex = routeSteps.findIndex(s => s.pool.some(m => m.toUpperCase().includes('BRUCKNER') || m.toUpperCase().includes('SINGER')));
+                if(startStepIndex === -1) startStepIndex = 1; 
+            } else if(statusUpper.includes('WAITING QC') || statusUpper.includes('WAITING LAB')) {
+                startStepIndex = routeSteps.findIndex(s => s.pool.some(m => m.toUpperCase().includes('QC')));
+                if(startStepIndex === -1) startStepIndex = routeSteps.length - 1;
+            } else if(statusUpper.includes('WAITING HEATSET')) {
+                 startStepIndex = routeSteps.findIndex(s => s.pool.some(m => m.toUpperCase().includes('HEATSET')));
+                 if(startStepIndex === -1) startStepIndex = 1;
+            }
+            startStepIndex = Math.max(0, startStepIndex);
+
+            let allocations = [];
+            let currentReady = initialReadyTime;
+
+            for(let i = startStepIndex; i < routeSteps.length; i++) {
+                const step = routeSteps[i];
+                let pool = step.pool;
+
+                // Rate Lookups
+                let stepRate = 500; 
+                const poolStr = pool.join(' ').toUpperCase();
+                if(poolStr.includes('CARD')) stepRate = r.card || 250;
+                else if(poolStr.includes('QC')) stepRate = r.qc || 400;
+                else stepRate = r.finish || 700;
+
+                // Overrides
+                if(overrides[ord.id]) {
+                    if(overrides[ord.id].card && poolStr.includes('CARD')) pool = [overrides[ord.id].card];
+                    if(overrides[ord.id].fin && !poolStr.includes('CARD') && !poolStr.includes('QC')) pool = [overrides[ord.id].fin];
+                    if(overrides[ord.id].qc && poolStr.includes('QC')) pool = [overrides[ord.id].qc];
+                }
+
+                // Move times
+                if(i > startStepIndex) {
+                    if(poolStr.includes('QC')) currentReady += 1800000;
+                    else currentReady += 3600000;
+                }
+
+                const res = allocate(pool, currentReady, (ord.qty / stepRate), ord.felt, ord.fiber);
+                allocations.push({ stepName: step.step, ...res });
+                currentReady = res.end;
+            }
+
+            // Fallbacks for display
+            const cardAlloc = allocations.find(a => a.mach.toUpperCase().includes('CARD')) || { mach: '-', start: null, end: null };
+            const finAlloc = allocations.find(a => !a.mach.toUpperCase().includes('CARD') && !a.mach.toUpperCase().includes('QC')) || { mach: '-', start: null, end: null };
+            const qcAlloc = allocations.find(a => a.mach.toUpperCase().includes('QC')) || { mach: '-', start: null, end: null };
+            const finalEnd = allocations.length > 0 ? allocations[allocations.length-1].end : now;
+
+            schedule.push({
+                ...ord,
+                allocations: allocations,
+                card: cardAlloc,
+                fin: finAlloc,
+                qc: qcAlloc,
+                globalEnd: finalEnd,
+                isLate: finalEnd > ord.rtsDate
+            });
+        });
+
+        // Helper: Greedy Allocation
+        function allocate(pool, readyTime, durHrs, felt, fiber) {
+            if(!pool || pool.length === 0) return { mach:'Err', start:readyTime, end:readyTime };
+            
+            const durMs = durHrs * 3600000;
+            let bestM = null;
+            let bestFinish = Infinity;
+            let bestStart = Infinity;
+
+            pool.forEach(mName => {
+                const mState = machineState[mName] || { time: now, lastFelt: null, lastFiber: null };
+                
+                // CRITICAL FIX: Ensure we never schedule before 'now' (simStart)
+                let start = Math.max(mState.time, readyTime, now);
+                
+                // SETUP PENALTY
+                if(mState.lastFelt && mState.lastFiber) {
+                    if(mState.lastFiber !== fiber) start += (config.setupPenalty * 3600000); 
+                    else if (mState.lastFelt !== felt) start += (config.setupPenalty * 3600000);
+                }
+
+                // Downtime Check
+                let conflict = true;
+                let attempts = 0;
+                while(conflict && attempts < 50) {
+                    conflict = false;
+                    const potentialEnd = start + durMs;
+                    const dt = activeDowntime.find(d => d.machine === mName && d.start < potentialEnd && d.end > start);
+                    if (dt) {
+                        start = dt.end;
+                        conflict = true;
+                    }
+                    attempts++;
+                }
+
+                const end = start + durMs;
+                if(end < bestFinish) {
+                    bestFinish = end;
+                    bestStart = start;
+                    bestM = mName;
+                }
+            });
+
+            if(bestM) {
+                if(!machineState[bestM]) machineState[bestM] = { time: now, lastFelt: null, lastFiber: null };
+                machineState[bestM].time = bestFinish;
+                machineState[bestM].lastFelt = felt;
+                machineState[bestM].lastFiber = fiber;
+                return { mach: bestM, start: bestStart, end: bestFinish };
+            }
+            return { mach:'Err', start:readyTime, end:readyTime+durMs };
+        }
+
+        // 4. ANALYTICS
+        let dayLoads = {};
+        schedule.forEach(s => {
+            s.allocations.forEach(t => {
+                if(t.start && t.end) {
+                    const startDay = Math.floor(t.start / 86400000);
+                    const endDay = Math.floor(t.end / 86400000);
+                    for(let i=startDay; i<=endDay; i++) dayLoads[i] = (dayLoads[i]||0) + 1;
+                }
+            });
+        });
+
+        self.postMessage({ schedule, dayLoads });
+    };
+</script>
+
+<script src="app.js"></script>
+</body>
+</html>
