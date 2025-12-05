@@ -529,22 +529,23 @@
             });
         });
 
-        // Helper: Greedy Allocation
+        // Helper: Preference-Based Allocation (Waterfall Logic)
         function allocate(pool, readyTime, durHrs, felt, fiber) {
             if(!pool || pool.length === 0) return { mach:'Err', start:readyTime, end:readyTime };
             
             const durMs = durHrs * 3600000;
-            let bestM = null;
-            let bestFinish = Infinity;
-            let bestStart = Infinity;
+            // SETTING: How much delay are you willing to tolerate to get your preferred machine?
+            // Currently set to 24 Hours. If the preferred machine is >24hrs slower than the best option, we switch.
+            const PATIENCE_THRESHOLD = 24 * 3600000; 
 
-            pool.forEach(mName => {
+            // 1. Calculate Valid Times for ALL Options
+            let options = pool.map(mName => {
                 const mState = machineState[mName] || { time: now, lastFelt: null, lastFiber: null };
                 
-                // CRITICAL FIX: Ensure we never schedule before 'now' (simStart)
+                // Ensure we never schedule before 'now' (simStart)
                 let start = Math.max(mState.time, readyTime, now);
                 
-                // SETUP PENALTY
+                // Setup Penalty
                 if(mState.lastFelt && mState.lastFiber) {
                     if(mState.lastFiber !== fiber) start += (config.setupPenalty * 3600000); 
                     else if (mState.lastFelt !== felt) start += (config.setupPenalty * 3600000);
@@ -565,21 +566,39 @@
                 }
 
                 const end = start + durMs;
-                if(end < bestFinish) {
-                    bestFinish = end;
-                    bestStart = start;
-                    bestM = mName;
-                }
+                return { mach: mName, start: start, end: end };
             });
 
-            if(bestM) {
-                if(!machineState[bestM]) machineState[bestM] = { time: now, lastFelt: null, lastFiber: null };
-                machineState[bestM].time = bestFinish;
-                machineState[bestM].lastFelt = felt;
-                machineState[bestM].lastFiber = fiber;
-                return { mach: bestM, start: bestStart, end: bestFinish };
+            // 2. Find the Absolute Mathematical Best Time (Benchmark)
+            const bestPossibleTime = Math.min(...options.map(o => o.end));
+
+            // 3. Select based on Preference Order
+            // We loop through 'options' in the same order as 'pool' (your preferred order).
+            let selectedOption = null;
+
+            for (let i = 0; i < options.length; i++) {
+                const opt = options[i];
+                // If this machine is within the "Patience Threshold" of the best possible time, TAKE IT.
+                // Since we iterate in order, this prioritizes the first machine that is "good enough".
+                if (opt.end <= (bestPossibleTime + PATIENCE_THRESHOLD)) {
+                    selectedOption = opt;
+                    break;
+                }
             }
-            return { mach:'Err', start:readyTime, end:readyTime+durMs };
+
+            // Fallback: If no preferred machine is close enough, just take the absolute fastest one.
+            if (!selectedOption) {
+                selectedOption = options.reduce((prev, curr) => prev.end < curr.end ? prev : curr);
+            }
+
+            // 4. Update Global State & Return
+            const mName = selectedOption.mach;
+            if(!machineState[mName]) machineState[mName] = { time: now, lastFelt: null, lastFiber: null };
+            machineState[mName].time = selectedOption.end;
+            machineState[mName].lastFelt = felt;
+            machineState[mName].lastFiber = fiber;
+
+            return selectedOption;
         }
 
         // 4. ANALYTICS
