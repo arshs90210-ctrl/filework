@@ -1,5 +1,5 @@
 /**
- * Alkegen Scheduler v7.5 - System Controller
+ * Alkegen Scheduler v8.0 - System Controller
  */
 
 const SB_URL = 'https://tihzqfpyfanohnazvkcx.supabase.co';
@@ -31,6 +31,7 @@ let WORKER = null;
 let ZOOM_PX = 60;
 let CHARTS = {};
 let USER_ROLE = 'viewer';
+let SALES_PEOPLE = new Set(); // Store unique sales names
 
 // --- AUTH & INIT ---
 
@@ -114,7 +115,12 @@ function loadLocalState() {
     const r = localStorage.getItem('alkegen_routes');
     const ov = localStorage.getItem('alkegen_overrides');
     
-    if(o) { RAW_ORDERS = JSON.parse(o); document.getElementById('orderStatus').innerText = `${RAW_ORDERS.length} Orders Restored`; document.getElementById('orderStatus').className = "text-green-600 text-xs"; }
+    if(o) { 
+        RAW_ORDERS = JSON.parse(o); 
+        document.getElementById('orderStatus').innerText = `${RAW_ORDERS.length} Orders Restored`; 
+        document.getElementById('orderStatus').className = "text-green-600 text-xs";
+        updateSalesDropdown(); // Populate filter on load
+    }
     if(r) { ROUTES = JSON.parse(r); renderSequencingTable(); }
     if(ov) OVERRIDES = JSON.parse(ov);
 }
@@ -153,7 +159,6 @@ function readFile(file) {
 async function handleOrderUpload(inp) {
     const wb = await readFile(inp.files[0]);
     let rows = [];
-    // Prioritize "Detail" or "Data" sheets which usually contain Absorption/WIP info
     for(const sn of wb.SheetNames) {
         const lower = sn.toLowerCase();
         if(lower.includes('detail') || lower.includes('data') || lower.includes('sheet2')) {
@@ -163,8 +168,10 @@ async function handleOrderUpload(inp) {
     }
     if(!rows.length) rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
 
+    SALES_PEOPLE.clear();
+
     RAW_ORDERS = rows.map((r, i) => {
-        let o = { id:`UNK-${i}`, felt:'Unknown', qty:0, wip:0, val:0, abs:0, status:'', fiber:'Generic' };
+        let o = { id:`UNK-${i}`, felt:'Unknown', qty:0, wip:0, val:0, abs:0, status:'', fiber:'Generic', sales:'Unknown' };
         for(let k in r) {
             const ck = k.toUpperCase().trim();
             const val = r[k];
@@ -173,21 +180,34 @@ async function handleOrderUpload(inp) {
             else if(ck === 'FELTCODE' || ck === 'FELT CODE') o.felt = val;
             else if(ck === 'BALANCE' || ck === 'BAL YDS' || ck === 'YARDSORD') o.qty = parseFloat(val)||0;
             else if(ck === 'YARDSWIP' || ck === 'WIP') o.wip = parseFloat(val)||0;
-            else if(ck.includes('TOTALSALES') || ck.includes('SALES BAL')) o.val = parseFloat(val)||0; // Updated parsing logic
-            else if(ck.includes('ABSORPTION') && ck.includes('TOTAL')) o.abs = parseFloat(val)||0; // NEW: Absorption
+            else if(ck.includes('TOTALSALES') || ck.includes('SALES BAL')) o.val = parseFloat(val)||0;
+            else if(ck.includes('ABSORPTION') && ck.includes('TOTAL')) o.abs = parseFloat(val)||0;
             else if(ck.includes('RTS') || ck === 'REQDATE') o.rtsRaw = val;
             else if(ck.includes('STATUS') || ck.includes('PRODUCTION AREA')) o.status = val;
             else if(ck.includes('FIBER') && ck.includes('DESC')) o.fiber = val;
+            else if(ck.includes('SALESNAME') || ck === 'SPERSON') o.sales = val; // Capture Sales Person
         }
+        if(o.sales) SALES_PEOPLE.add(o.sales);
+
         if(typeof o.rtsRaw === 'number') o.rtsDate = new Date(Math.round((o.rtsRaw - 25569)*86400*1000)).getTime();
         else if(o.rtsRaw) o.rtsDate = new Date(o.rtsRaw).getTime();
         else o.rtsDate = new Date('2099-12-31').getTime();
         return o;
     }).filter(o => o.qty > 0);
 
+    updateSalesDropdown();
     document.getElementById('orderStatus').innerText = `${RAW_ORDERS.length} Orders Loaded`;
     document.getElementById('orderStatus').className = "text-green-600 text-xs";
     saveLocalState();
+}
+
+function updateSalesDropdown() {
+    const sel = document.getElementById('kpiSalesFilter');
+    if(!sel) return;
+    sel.innerHTML = '<option value="ALL">All Sales Teams</option>';
+    Array.from(SALES_PEOPLE).sort().forEach(s => {
+        sel.innerHTML += `<option value="${s}">${s}</option>`;
+    });
 }
 
 async function handleRateUpload(inp) {
@@ -246,7 +266,7 @@ async function handleRouteUpload(inp) {
     saveLocalState();
 }
 
-// --- MASS ROUTE UPDATE (NEW) ---
+// --- MASS ROUTE UPDATE ---
 function applyMassRoute() {
     if(USER_ROLE !== 'admin') return alert('Admin only');
     const filter = document.getElementById('massRouteFilter').value.toUpperCase();
@@ -254,7 +274,6 @@ function applyMassRoute() {
     
     if(!filter || !raw) return alert("Please fill both fields");
 
-    // Parse the new route string
     const parts = raw.split(',');
     const newSteps = parts.map((p, i) => {
         const machines = p.split('/').map(m => m.trim());
@@ -262,8 +281,6 @@ function applyMassRoute() {
     });
 
     let count = 0;
-    // Apply to orders AND existing route definitions
-    // 1. Update defined routes
     Object.keys(ROUTES).forEach(k => {
         if(k.toUpperCase().includes(filter)) {
             ROUTES[k] = newSteps;
@@ -271,7 +288,6 @@ function applyMassRoute() {
         }
     });
     
-    // 2. Also ensure felt codes in Open Orders that might not be in ROUTES yet get this
     RAW_ORDERS.forEach(o => {
         if(o.felt.toUpperCase().includes(filter) && !ROUTES[o.felt]) {
             ROUTES[o.felt] = newSteps;
@@ -611,16 +627,23 @@ function showTooltip(e, txt) {
     tt.innerText = txt;
 }
 
-// --- KPI RENDERING (ENHANCED) ---
+// --- KPI RENDERING (Sales Interactive) ---
 function renderKPIs() {
-    const totYds = SCHEDULE.reduce((a,b)=>a+b.qty,0);
-    const totRev = SCHEDULE.reduce((a,b)=>a+b.val,0);
-    const totAbs = SCHEDULE.reduce((a,b)=>a+(b.abs || 0), 0); // New Absorption Metric
-    const lateVal = SCHEDULE.filter(x=>x.isLate).reduce((a,b)=>a+b.val,0);
+    const salesFilter = document.getElementById('kpiSalesFilter').value;
+    
+    // Filter Data based on selection
+    const filteredSchedule = (salesFilter === 'ALL') 
+        ? SCHEDULE 
+        : SCHEDULE.filter(row => row.sales === salesFilter);
+
+    const totYds = filteredSchedule.reduce((a,b)=>a+b.qty,0);
+    const totRev = filteredSchedule.reduce((a,b)=>a+b.val,0);
+    const totAbs = filteredSchedule.reduce((a,b)=>a+(b.abs || 0), 0);
+    const lateVal = filteredSchedule.filter(x=>x.isLate).reduce((a,b)=>a+b.val,0);
     
     document.getElementById('kpiYds').innerText = totYds.toLocaleString();
     document.getElementById('kpiRev').innerText = '$' + (totRev/1000000).toFixed(2) + 'M';
-    document.getElementById('kpiAbs').innerText = '$' + (totAbs/1000000).toFixed(2) + 'M'; // New Display
+    document.getElementById('kpiAbs').innerText = '$' + (totAbs/1000000).toFixed(2) + 'M';
     document.getElementById('kpiLate').innerText = '$' + lateVal.toLocaleString();
     
     if(CHARTS.load) CHARTS.load.destroy();
@@ -630,7 +653,7 @@ function renderKPIs() {
     const revData = {};
     const absData = {};
 
-    SCHEDULE.forEach(r => {
+    filteredSchedule.forEach(r => {
         const allocs = r.allocations || [r.card, r.fin, r.qc];
         allocs.forEach(t => {
             if(t.mach && t.mach!=='Err' && t.mach !== '-') machLoad[t.mach] = (machLoad[t.mach]||0) + r.qty;
@@ -646,13 +669,12 @@ function renderKPIs() {
         options: { responsive: true, maintainAspectRatio: false }
     });
 
-    // Dual-Line Chart: Revenue vs Absorption
     CHARTS.rev = new Chart(document.getElementById('chartRev'), {
         type: 'line',
         data: { 
             labels: Object.keys(revData), 
             datasets: [
-                { label: 'Revenue Forecast', data: Object.values(revData), borderColor: '#22c55e', fill: false, tension: 0.3 },
+                { label: 'Revenue', data: Object.values(revData), borderColor: '#22c55e', fill: false, tension: 0.3 },
                 { label: 'Absorption', data: Object.values(absData), borderColor: '#3b82f6', fill: false, tension: 0.3, borderDash: [5,5] }
             ] 
         },
