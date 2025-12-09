@@ -1,5 +1,5 @@
 /**
- * Alkegen Scheduler v10.0 - Shift Planner Logic
+ * Alkegen Scheduler v11.0 - Hybrid System Controller
  */
 
 const SB_URL = 'https://tihzqfpyfanohnazvkcx.supabase.co';
@@ -24,14 +24,13 @@ let ROUTES = {};
 let STAFFING = {}; 
 let OVERRIDES = {}; 
 
-// NEW STATES FOR V10
 let SHIFT_DEFS = [
     { start: 8, dur: 8 },  // Shift 1: 08:00 - 16:00
     { start: 16, dur: 8 }, // Shift 2: 16:00 - 00:00
     { start: 0, dur: 8 }   // Shift 3: 00:00 - 08:00
 ];
-let HOLIDAYS = []; // Array of "YYYY-MM-DD"
-let EXCEPTIONS = []; // Array of {machine, start, end, pattern:[bool,bool,bool]}
+let HOLIDAYS = []; 
+let EXCEPTIONS = []; 
 
 let RAW_ORDERS = [];
 let SCHEDULE = [];
@@ -42,82 +41,39 @@ let CHARTS = {};
 let USER_ROLE = 'viewer';
 let SALES_PEOPLE = new Set();
 
-// --- AUTH & INIT ---
-
+// --- INIT ---
 async function handleLogin() {
     const email = document.getElementById('email').value;
     const password = document.getElementById('password').value;
     const { data, error } = await sb.auth.signInWithPassword({ email, password });
-    if (error) {
-        document.getElementById('loginError').innerText = error.message;
-        document.getElementById('loginError').classList.remove('hidden');
-    } else {
-        initApp(data.user);
-    }
+    if (error) { document.getElementById('loginError').innerText = error.message; document.getElementById('loginError').classList.remove('hidden'); } 
+    else { initApp(data.user); }
 }
-
-async function handleLogout() {
-    await sb.auth.signOut();
-    window.location.reload();
-}
+async function handleLogout() { await sb.auth.signOut(); window.location.reload(); }
 
 async function initApp(user) {
     document.getElementById('loginScreen').classList.add('hidden');
     document.getElementById('mainApp').classList.remove('hidden');
     document.getElementById('userEmailDisplay').innerText = user.email;
-
-    try {
-        const { data, error } = await sb.from('user_roles').select('role').eq('id', user.id).single();
-        if (data && data.role) USER_ROLE = data.role;
-    } catch (e) { console.log('Role fetch failed'); }
-    
-    if(user.email.includes('admin') || user.email === 'admin@alkegen.com') USER_ROLE = 'admin';
-
+    try { const { data } = await sb.from('user_roles').select('role').eq('id', user.id).single(); if (data) USER_ROLE = data.role; } catch (e) {}
+    if(user.email.includes('admin')) USER_ROLE = 'admin';
     document.getElementById('userRoleBadge').innerText = USER_ROLE.charAt(0).toUpperCase() + USER_ROLE.slice(1);
     if (USER_ROLE === 'admin') document.body.classList.add('is-admin');
-
     document.getElementById('simDate').valueAsDate = new Date();
     CONFIG.machines.forEach(m => STAFFING[m] = [true, true, true]);
-    
     initWorker();
-    initUI();
+    populateDropdowns();
     renderStaffingTable();
-    await loadFromDB();
     loadLocalState(); 
-
     const mainScroll = document.getElementById('mainScroll');
     const headerScroll = document.getElementById('timelineHeaderWrapper');
-    mainScroll.addEventListener('scroll', () => {
-        if(headerScroll) headerScroll.scrollLeft = mainScroll.scrollLeft;
-    });
-}
-
-// --- DATA PERSISTENCE ---
-
-async function loadFromDB() {
-    try {
-        const { data: dt } = await sb.from('downtime').select('*');
-        if(dt) {
-            DOWNTIME = dt.map(d => ({
-                id: d.id, machine: d.machine, start: new Date(d.start_time).getTime(), end: new Date(d.end_time).getTime(), reason: d.reason
-            }));
-            renderDowntimeTable();
-        }
-        const { data: rt } = await sb.from('rates').select('*');
-        if(rt) {
-            rt.forEach(r => {
-                RATES[r.felt_code] = { card: r.card_rate, finish: r.finish_rate, qc: r.qc_rate };
-            });
-            renderRatesTable();
-        }
-    } catch(e) { console.log('DB load skipped'); }
+    mainScroll.addEventListener('scroll', () => { if(headerScroll) headerScroll.scrollLeft = mainScroll.scrollLeft; });
 }
 
 function saveLocalState() {
     localStorage.setItem('alkegen_orders', JSON.stringify(RAW_ORDERS));
     localStorage.setItem('alkegen_routes', JSON.stringify(ROUTES));
     localStorage.setItem('alkegen_overrides', JSON.stringify(OVERRIDES));
-    // V10 NEW
     localStorage.setItem('alkegen_shifts', JSON.stringify(SHIFT_DEFS));
     localStorage.setItem('alkegen_holidays', JSON.stringify(HOLIDAYS));
     localStorage.setItem('alkegen_exceptions', JSON.stringify(EXCEPTIONS));
@@ -127,32 +83,18 @@ function loadLocalState() {
     const o = localStorage.getItem('alkegen_orders');
     const r = localStorage.getItem('alkegen_routes');
     const ov = localStorage.getItem('alkegen_overrides');
-    // V10 NEW
     const sh = localStorage.getItem('alkegen_shifts');
     const ho = localStorage.getItem('alkegen_holidays');
     const ex = localStorage.getItem('alkegen_exceptions');
-    
-    if(o) { 
-        RAW_ORDERS = JSON.parse(o); 
-        document.getElementById('orderStatus').innerText = `${RAW_ORDERS.length} Orders Restored`; 
-        document.getElementById('orderStatus').className = "text-green-600 text-xs";
-        updateSalesDropdown();
-    }
+    if(o) { RAW_ORDERS = JSON.parse(o); updateSalesDropdown(); }
     if(r) { ROUTES = JSON.parse(r); renderSequencingTable(); }
     if(ov) OVERRIDES = JSON.parse(ov);
-    
     if(sh) { SHIFT_DEFS = JSON.parse(sh); updateShiftInputs(); }
     if(ho) { HOLIDAYS = JSON.parse(ho); renderHolidays(); }
     if(ex) { EXCEPTIONS = JSON.parse(ex); renderExceptions(); }
 }
 
-document.addEventListener('DOMContentLoaded', async () => {
-    const { data: { session } } = await sb.auth.getSession();
-    if (session) initApp(session.user);
-    populateDropdowns();
-});
-
-// --- WORKER & PARSING ---
+document.addEventListener('DOMContentLoaded', async () => { const { data: { session } } = await sb.auth.getSession(); if (session) initApp(session.user); populateDropdowns(); });
 
 function initWorker() {
     const blob = new Blob([document.getElementById('worker-script').textContent], {type: "text/javascript"});
@@ -177,26 +119,20 @@ function readFile(file) {
     });
 }
 
+// --- DATA HANDLERS ---
 async function handleOrderUpload(inp) {
     const wb = await readFile(inp.files[0]);
     let rows = [];
     for(const sn of wb.SheetNames) {
-        const lower = sn.toLowerCase();
-        if(lower.includes('detail') || lower.includes('data') || lower.includes('sheet2')) {
-             rows = XLSX.utils.sheet_to_json(wb.Sheets[sn]);
-             break;
-        }
+        if(sn.toLowerCase().includes('detail') || sn.toLowerCase().includes('data')) { rows = XLSX.utils.sheet_to_json(wb.Sheets[sn]); break; }
     }
     if(!rows.length) rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
-
     SALES_PEOPLE.clear();
-
     RAW_ORDERS = rows.map((r, i) => {
         let o = { id:`UNK-${i}`, felt:'Unknown', qty:0, wip:0, val:0, abs:0, status:'', fiber:'Generic', sales:'Unknown' };
         for(let k in r) {
             const ck = k.toUpperCase().trim();
             const val = r[k];
-            
             if(ck.includes('ORDER') && ck.includes('ID')) o.id = val;
             else if(ck === 'FELTCODE' || ck === 'FELT CODE') o.felt = val;
             else if(ck === 'BALANCE' || ck === 'BAL YDS' || ck === 'YARDSORD') o.qty = parseFloat(val)||0;
@@ -209,13 +145,11 @@ async function handleOrderUpload(inp) {
             else if(ck.includes('SALESNAME') || ck === 'SPERSON') o.sales = val; 
         }
         if(o.sales) SALES_PEOPLE.add(o.sales);
-
         if(typeof o.rtsRaw === 'number') o.rtsDate = new Date(Math.round((o.rtsRaw - 25569)*86400*1000)).getTime();
         else if(o.rtsRaw) o.rtsDate = new Date(o.rtsRaw).getTime();
         else o.rtsDate = new Date('2099-12-31').getTime();
         return o;
     }).filter(o => o.qty > 0);
-
     updateSalesDropdown();
     document.getElementById('orderStatus').innerText = `${RAW_ORDERS.length} Orders Loaded`;
     document.getElementById('orderStatus').className = "text-green-600 text-xs";
@@ -226,157 +160,49 @@ function updateSalesDropdown() {
     const sel = document.getElementById('kpiSalesFilter');
     if(!sel) return;
     sel.innerHTML = '<option value="ALL">All Sales Teams</option>';
-    Array.from(SALES_PEOPLE).sort().forEach(s => {
-        sel.innerHTML += `<option value="${s}">${s}</option>`;
-    });
+    Array.from(SALES_PEOPLE).sort().forEach(s => { sel.innerHTML += `<option value="${s}">${s}</option>`; });
 }
 
-// ... [handleRateUpload and handleRouteUpload kept same as v9.0] ... 
-async function handleRateUpload(inp) { /* Same as before */ const wb = await readFile(inp.files[0]); const data = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]); data.forEach(r => { const code = r['Felt Code'] || r['Code']; if(code) { RATES[code.trim()] = { card: parseFloat(r['Carding Rate (yds/hr)'] || 250), finish: parseFloat(r['Finishing Rate (yds/hr)'] || 700), qc: parseFloat(r['QC Rate (yds/hr)'] || 400) }; } }); document.getElementById('rateStatus').innerText = "Rates Loaded"; document.getElementById('rateStatus').className = "text-green-600 text-xs"; renderRatesTable(); }
-async function handleRouteUpload(inp) { /* Same as before */ const wb = await readFile(inp.files[0]); let sheetName = wb.SheetNames.find(n => n.includes('Sheet4')) || wb.SheetNames[0]; const data = XLSX.utils.sheet_to_json(wb.Sheets[sheetName]); let tempRoutes = {}; let grouped = {}; data.forEach(r => { const felt = r['FELTCODE']; if(!felt) return; if(!grouped[felt]) grouped[felt] = []; grouped[felt].push({ mach: r['MACHNAME'], order: parseInt(r['MACHORD'] || 1) }); }); Object.keys(grouped).forEach(felt => { const entries = grouped[felt]; entries.sort((a,b) => a.order - b.order); let steps = []; let currentOrder = -1; entries.forEach(e => { const normMach = CONFIG.machines.find(m => m.toUpperCase().replace(/\s/g,'') === e.mach.toUpperCase().replace(/\s/g,'').replace('#','')) || e.mach; if(e.order !== currentOrder) { steps.push({ step: e.order, pool: [normMach] }); currentOrder = e.order; } else { steps[steps.length-1].pool.push(normMach); } }); tempRoutes[felt] = steps; }); ROUTES = tempRoutes; document.getElementById('routeStatus').innerText = "Digital Schedule Parsed"; document.getElementById('routeStatus').className = "text-green-600 text-xs"; renderSequencingTable(); saveLocalState(); }
+// ... [Rate Upload, Route Upload, Mass Route same as previous] ...
+async function handleRateUpload(inp) { const wb = await readFile(inp.files[0]); const data = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]); data.forEach(r => { const code = r['Felt Code'] || r['Code']; if(code) { RATES[code.trim()] = { card: parseFloat(r['Carding Rate (yds/hr)'] || 250), finish: parseFloat(r['Finishing Rate (yds/hr)'] || 700), qc: parseFloat(r['QC Rate (yds/hr)'] || 400) }; } }); document.getElementById('rateStatus').innerText = "Rates Loaded"; document.getElementById('rateStatus').className = "text-green-600 text-xs"; renderRatesTable(); }
+async function handleRouteUpload(inp) { const wb = await readFile(inp.files[0]); let sheetName = wb.SheetNames.find(n => n.includes('Sheet4')) || wb.SheetNames[0]; const data = XLSX.utils.sheet_to_json(wb.Sheets[sheetName]); let tempRoutes = {}; let grouped = {}; data.forEach(r => { const felt = r['FELTCODE']; if(!felt) return; if(!grouped[felt]) grouped[felt] = []; grouped[felt].push({ mach: r['MACHNAME'], order: parseInt(r['MACHORD'] || 1) }); }); Object.keys(grouped).forEach(felt => { const entries = grouped[felt]; entries.sort((a,b) => a.order - b.order); let steps = []; let currentOrder = -1; entries.forEach(e => { const normMach = CONFIG.machines.find(m => m.toUpperCase().replace(/\s/g,'') === e.mach.toUpperCase().replace(/\s/g,'').replace('#','')) || e.mach; if(e.order !== currentOrder) { steps.push({ step: e.order, pool: [normMach] }); currentOrder = e.order; } else { steps[steps.length-1].pool.push(normMach); } }); tempRoutes[felt] = steps; }); ROUTES = tempRoutes; document.getElementById('routeStatus').innerText = "Digital Schedule Parsed"; document.getElementById('routeStatus').className = "text-green-600 text-xs"; renderSequencingTable(); saveLocalState(); }
+function applyMassRoute() { if(USER_ROLE !== 'admin') return alert('Admin only'); const filter = document.getElementById('massRouteFilter').value.toUpperCase(); const raw = document.getElementById('massRouteString').value; if(!filter || !raw) return alert("Please fill both fields"); const parts = raw.split(','); const newSteps = parts.map((p, i) => { const machines = p.split('/').map(m => m.trim()); return { step: i+1, pool: machines }; }); let count = 0; Object.keys(ROUTES).forEach(k => { if(k.toUpperCase().includes(filter)) { ROUTES[k] = newSteps; count++; } }); RAW_ORDERS.forEach(o => { if(o.felt.toUpperCase().includes(filter) && !ROUTES[o.felt]) { ROUTES[o.felt] = newSteps; count++; } }); alert(`Updated routes for ${count} Felt Codes.`); document.getElementById('massRouteModal').style.display='none'; renderSequencingTable(); saveLocalState(); runEngine(); }
 
-// --- SHIFT & EXCEPTION MANAGEMENT (V10 NEW) ---
-
+// --- SHIFT LOGIC ---
 function updateShiftConfig() {
     SHIFT_DEFS[0].start = parseInt(document.getElementById('shift1Start').value);
     SHIFT_DEFS[1].start = parseInt(document.getElementById('shift2Start').value);
     SHIFT_DEFS[2].start = parseInt(document.getElementById('shift3Start').value);
-    // Simple logic assuming 8h for now, user can extend later
     document.getElementById('shift1EndDisplay').innerText = `${(SHIFT_DEFS[0].start+8)%24}:00`;
     document.getElementById('shift2EndDisplay').innerText = `${(SHIFT_DEFS[1].start+8)%24}:00`;
     document.getElementById('shift3EndDisplay').innerText = `${(SHIFT_DEFS[2].start+8)%24}:00`;
     saveLocalState();
 }
-
-function updateShiftInputs() {
-    document.getElementById('shift1Start').value = SHIFT_DEFS[0].start;
-    document.getElementById('shift2Start').value = SHIFT_DEFS[1].start;
-    document.getElementById('shift3Start').value = SHIFT_DEFS[2].start;
-}
-
-function addHoliday() {
-    const d = document.getElementById('holidayInput').value;
-    if(d && !HOLIDAYS.includes(d)) {
-        HOLIDAYS.push(d);
-        renderHolidays();
-        saveLocalState();
-    }
-}
-
-function renderHolidays() {
-    const div = document.getElementById('holidayList');
-    div.innerHTML = HOLIDAYS.sort().map(h => 
-        `<span class="inline-flex items-center gap-1 bg-red-50 text-red-600 px-2 py-1 rounded text-xs font-mono border border-red-100">
-            ${h} <button onclick="removeHoliday('${h}')" class="hover:text-red-800 ml-1">×</button>
-        </span>`
-    ).join('');
-}
-
-function removeHoliday(h) {
-    HOLIDAYS = HOLIDAYS.filter(x => x !== h);
-    renderHolidays();
-    saveLocalState();
-}
-
-function addException() {
-    const mach = document.getElementById('exMachine').value;
-    const start = document.getElementById('exStart').value;
-    const end = document.getElementById('exEnd').value;
-    const s1 = document.getElementById('exS1').checked;
-    const s2 = document.getElementById('exS2').checked;
-    const s3 = document.getElementById('exS3').checked;
-
-    if(!start || !end) return alert("Select dates");
-
-    EXCEPTIONS.push({
-        id: Date.now(),
-        machine: mach,
-        start: start,
-        end: end,
-        pattern: [s1, s2, s3]
-    });
-    renderExceptions();
-    saveLocalState();
-}
-
-function renderExceptions() {
-    const tb = document.getElementById('exceptionBody');
-    tb.innerHTML = EXCEPTIONS.map((ex, i) => `
-        <tr class="border-b hover:bg-slate-50">
-            <td class="p-3 font-bold text-slate-700">${ex.machine === 'ALL' ? 'ALL MACHINES' : ex.machine}</td>
-            <td class="p-3 font-mono text-xs">${ex.start} -> ${ex.end}</td>
-            <td class="p-3 text-center">${ex.pattern[0]?'<i class="fa-solid fa-check text-green-500"></i>':'<span class="text-red-300">-</span>'}</td>
-            <td class="p-3 text-center">${ex.pattern[1]?'<i class="fa-solid fa-check text-green-500"></i>':'<span class="text-red-300">-</span>'}</td>
-            <td class="p-3 text-center">${ex.pattern[2]?'<i class="fa-solid fa-check text-green-500"></i>':'<span class="text-red-300">-</span>'}</td>
-            <td class="p-3 text-center"><button onclick="removeException(${i})" class="text-red-400 hover:text-red-600"><i class="fa-solid fa-trash"></i></button></td>
-        </tr>
-    `).join('');
-}
-
-function removeException(idx) {
-    EXCEPTIONS.splice(idx, 1);
-    renderExceptions();
-    saveLocalState();
-}
-
-// --- UI POPULATION ---
-function initUI() { populateDropdowns(); }
+function updateShiftInputs() { document.getElementById('shift1Start').value = SHIFT_DEFS[0].start; document.getElementById('shift2Start').value = SHIFT_DEFS[1].start; document.getElementById('shift3Start').value = SHIFT_DEFS[2].start; }
+function addHoliday() { const d = document.getElementById('holidayInput').value; if(d && !HOLIDAYS.includes(d)) { HOLIDAYS.push(d); renderHolidays(); saveLocalState(); } }
+function renderHolidays() { document.getElementById('holidayList').innerHTML = HOLIDAYS.sort().map(h => `<span class="inline-flex items-center gap-1 bg-red-50 text-red-600 px-2 py-1 rounded text-xs font-mono border border-red-100">${h} <button onclick="removeHoliday('${h}')" class="hover:text-red-800 ml-1">×</button></span>`).join(''); }
+function removeHoliday(h) { HOLIDAYS = HOLIDAYS.filter(x => x !== h); renderHolidays(); saveLocalState(); }
+function addException() { const mach = document.getElementById('exMachine').value; const start = document.getElementById('exStart').value; const end = document.getElementById('exEnd').value; if(!start || !end) return alert("Select dates"); EXCEPTIONS.push({ id: Date.now(), machine: mach, start: start, end: end, pattern: [document.getElementById('exS1').checked, document.getElementById('exS2').checked, document.getElementById('exS3').checked] }); renderExceptions(); saveLocalState(); }
+function renderExceptions() { document.getElementById('exceptionBody').innerHTML = EXCEPTIONS.map((ex, i) => `<tr class="border-b hover:bg-slate-50"><td class="p-3 font-bold text-slate-700">${ex.machine === 'ALL' ? 'ALL MACHINES' : ex.machine}</td><td class="p-3 font-mono text-xs">${ex.start} -> ${ex.end}</td><td class="p-3 text-center">${ex.pattern[0]?'<i class="fa-solid fa-check text-green-500"></i>':'<span class="text-red-300">-</span>'}</td><td class="p-3 text-center">${ex.pattern[1]?'<i class="fa-solid fa-check text-green-500"></i>':'<span class="text-red-300">-</span>'}</td><td class="p-3 text-center">${ex.pattern[2]?'<i class="fa-solid fa-check text-green-500"></i>':'<span class="text-red-300">-</span>'}</td><td class="p-3 text-center"><button onclick="removeException(${i})" class="text-red-400 hover:text-red-600"><i class="fa-solid fa-trash"></i></button></td></tr>`).join(''); }
+function removeException(idx) { EXCEPTIONS.splice(idx, 1); renderExceptions(); saveLocalState(); }
 
 function populateDropdowns() {
-    // 1. Existing dropdowns
-    ['dtMachine', 'massSeqCard', 'massSeqFin', 'forceCard', 'forceFin', 'forceQC'].forEach(id => {
-        const sel = document.getElementById(id);
-        if(!sel) return;
-        sel.innerHTML = id.includes('massSeq') || id.includes('force') ? '<option value="">Auto (Engine)</option>' : '';
-        CONFIG.machines.forEach(m => sel.innerHTML += `<option value="${m}">${m}</option>`);
-    });
-
-    // 2. New Exception Dropdown
-    const exSel = document.getElementById('exMachine');
-    if(exSel) {
-        exSel.innerHTML = '<option value="ALL">ALL MACHINES</option>';
-        CONFIG.machines.forEach(m => exSel.innerHTML += `<option value="${m}">${m}</option>`);
-    }
+    ['dtMachine', 'massSeqCard', 'massSeqFin', 'forceCard', 'forceFin', 'forceQC'].forEach(id => { const sel = document.getElementById(id); if(!sel) return; sel.innerHTML = id.includes('massSeq') || id.includes('force') ? '<option value="">Auto (Engine)</option>' : ''; CONFIG.machines.forEach(m => sel.innerHTML += `<option value="${m}">${m}</option>`); });
+    const exSel = document.getElementById('exMachine'); if(exSel) { exSel.innerHTML = '<option value="ALL">ALL MACHINES</option>'; CONFIG.machines.forEach(m => exSel.innerHTML += `<option value="${m}">${m}</option>`); }
 }
 
-// --- ENGINE RUNNER ---
 function runEngine() {
     if(!RAW_ORDERS.length) return;
     document.getElementById('engineStatus').innerText = "SOLVING...";
     document.getElementById('engineStatus').className = "text-yellow-600 animate-pulse";
-    
-    const simStart = document.getElementById('simDate').valueAsDate 
-        ? document.getElementById('simDate').valueAsDate.getTime() 
-        : new Date().setHours(8,0,0,0);
-
-    const activeOrders = RAW_ORDERS.filter(o => {
-        const s = (o.status || '').toUpperCase();
-        if (s.includes('SHIPPED') || s.includes('CLOSE') || s.includes('COMPLETE') || s.includes('INVOICED')) return false;
-        if (o.qty <= 10) return false;
-        return true;
-    });
-
-    // PASS NEW STATES TO WORKER
-    WORKER.postMessage({
-        orders: activeOrders,
-        rates: RATES,
-        config: CONFIG,
-        downtime: DOWNTIME,
-        simStart: simStart,
-        routes: ROUTES,
-        staffing: STAFFING,
-        overrides: OVERRIDES,
-        shiftDefs: SHIFT_DEFS,
-        holidays: HOLIDAYS,
-        exceptions: EXCEPTIONS
-    });
+    const simStart = document.getElementById('simDate').valueAsDate ? document.getElementById('simDate').valueAsDate.getTime() : new Date().setHours(8,0,0,0);
+    const activeOrders = RAW_ORDERS.filter(o => { const s = (o.status || '').toUpperCase(); if (s.includes('SHIPPED') || s.includes('CLOSE') || s.includes('COMPLETE') || s.includes('INVOICED')) return false; if (o.qty <= 10) return false; return true; });
+    WORKER.postMessage({ orders: activeOrders, rates: RATES, config: CONFIG, downtime: DOWNTIME, simStart: simStart, routes: ROUTES, staffing: STAFFING, overrides: OVERRIDES, shiftDefs: SHIFT_DEFS, holidays: HOLIDAYS, exceptions: EXCEPTIONS });
 }
 
-// ... [Keep renderAll, switchView, etc. same as before] ...
+// ... [Render Functions and Helpers identical to v9.0] ...
 function renderAll() {
-    const tbody = document.getElementById('taskTableBody');
-    const timelineHeader = document.getElementById('timelineHeader');
-    const timelineBody = document.getElementById('timelineBody');
+    const tbody = document.getElementById('taskTableBody'); const timelineHeader = document.getElementById('timelineHeader'); const timelineBody = document.getElementById('timelineBody');
     tbody.innerHTML = ''; timelineHeader.innerHTML = ''; timelineBody.innerHTML = '';
     if(!SCHEDULE.length) return;
     const now = document.getElementById('simDate').valueAsDate.getTime();
@@ -387,78 +213,47 @@ function renderAll() {
     const startDayIdx = Math.floor(now / 86400000);
     const headerFrag = document.createDocumentFragment();
     for(let i=0; i<totalDays; i++) {
-        const t = now + (i * 86400000);
-        const d = new Date(t);
-        const isWk = d.getDay()===0 || d.getDay()===6;
-        const load = DAY_LOADS[startDayIdx + i] || 0;
-        const heatClass = load > 200 ? 'bg-red-500' : (load > 100 ? 'bg-amber-400' : 'bg-green-500');
-        const div = document.createElement('div');
-        div.className = `day-col ${isWk?'weekend':''}`;
-        div.style.width = `${ZOOM_PX}px`;
-        div.innerHTML = `<span class="mt-2 font-bold">${d.getDate()}</span><span style="font-size:9px">${d.toLocaleString('default',{month:'short'})}</span><div class="absolute bottom-0 left-0 right-0 h-1 ${heatClass} opacity-50"></div>`;
+        const t = now + (i * 86400000); const d = new Date(t); const isWk = d.getDay()===0 || d.getDay()===6; const load = DAY_LOADS[startDayIdx + i] || 0; const heatClass = load > 200 ? 'bg-red-500' : (load > 100 ? 'bg-amber-400' : 'bg-green-500');
+        const div = document.createElement('div'); div.className = `day-col ${isWk?'weekend':''}`; div.style.width = `${ZOOM_PX}px`; div.innerHTML = `<span class="mt-2 font-bold">${d.getDate()}</span><span style="font-size:9px">${d.toLocaleString('default',{month:'short'})}</span><div class="absolute bottom-0 left-0 right-0 h-1 ${heatClass} opacity-50"></div>`;
         headerFrag.appendChild(div);
     }
     timelineHeader.appendChild(headerFrag);
-    const tableFrag = document.createDocumentFragment();
-    const chartFrag = document.createDocumentFragment();
+    const tableFrag = document.createDocumentFragment(); const chartFrag = document.createDocumentFragment();
     SCHEDULE.forEach(row => {
-        const isForced = OVERRIDES[row.id];
-        const tr = document.createElement('tr');
-        if(row.isLate) tr.classList.add('late-row');
+        const isForced = OVERRIDES[row.id]; const tr = document.createElement('tr'); if(row.isLate) tr.classList.add('late-row');
         tr.innerHTML = `<td><span class="inline-block w-2 h-2 rounded-full mr-2 ${row.isLate?'bg-red-500':'bg-green-500'}"></span>${row.status || 'New'}</td><td class="font-mono text-xs cursor-pointer hover:text-blue-600 underline ${isForced?'override-text':''}" onclick="openEditModal('${row.id}')">${row.id} ${isForced?'*':''}</td><td class="font-bold text-blue-600 text-xs">${row.felt}</td><td class="text-[9px] text-slate-500 truncate" title="${row.fiber}">${row.fiber || '-'}</td><td class="text-[9px] text-slate-500 truncate">${row.status || '-'}</td><td class="text-right font-mono text-xs">${row.qty.toLocaleString()}</td>`;
         tableFrag.appendChild(tr);
-        const trDiv = document.createElement('div');
-        trDiv.className = 'chart-row';
-        trDiv.style.width = `${width}px`;
+        const trDiv = document.createElement('div'); trDiv.className = 'chart-row'; trDiv.style.width = `${width}px`;
         const drawBar = (task, name) => {
             if(!task.start || task.mach === 'Err' || task.mach === '-') return;
-            const startPx = ((task.start - now) / 86400000) * ZOOM_PX;
-            const durPx = Math.max(((task.end - task.start) / 86400000) * ZOOM_PX, 4);
+            const startPx = ((task.start - now) / 86400000) * ZOOM_PX; const durPx = Math.max(((task.end - task.start) / 86400000) * ZOOM_PX, 4);
             let type = 'fin'; const mUp = task.mach.toUpperCase(); if(mUp.includes('CARD')) type = 'card'; else if(mUp.includes('QC')) type = 'qc';
-            const b = document.createElement('div');
-            b.className = `bar bar-${type} ${isForced?'bar-forced':''}`;
-            b.style.left = `${startPx}px`;
-            b.style.width = `${durPx}px`;
-            b.innerText = task.mach;
-            b.onclick = () => openEditModal(row.id);
-            b.onmouseover = (e) => showTooltip(e, `${row.id} (${row.felt})\n${task.mach}\nStep: ${name}\n${new Date(task.start).toLocaleString()} - ${new Date(task.end).toLocaleString()}`);
-            b.onmouseout = () => document.getElementById('tooltip').style.display='none';
+            const b = document.createElement('div'); b.className = `bar bar-${type} ${isForced?'bar-forced':''}`; b.style.left = `${startPx}px`; b.style.width = `${durPx}px`; b.innerText = task.mach; b.onclick = () => openEditModal(row.id); b.onmouseover = (e) => showTooltip(e, `${row.id} (${row.felt})\n${task.mach}\nStep: ${name}\n${new Date(task.start).toLocaleString()} - ${new Date(task.end).toLocaleString()}`); b.onmouseout = () => document.getElementById('tooltip').style.display='none';
             trDiv.appendChild(b);
         };
-        if (row.allocations && row.allocations.length > 0) { row.allocations.forEach(alloc => drawBar(alloc, alloc.stepName)); } 
-        else { drawBar(row.card, 'Card'); drawBar(row.fin, 'Finish'); drawBar(row.qc, 'QC'); }
+        if (row.allocations && row.allocations.length > 0) { row.allocations.forEach(alloc => drawBar(alloc, alloc.stepName)); } else { drawBar(row.card, 'Card'); drawBar(row.fin, 'Finish'); drawBar(row.qc, 'QC'); }
         chartFrag.appendChild(trDiv);
     });
-    tbody.appendChild(tableFrag);
-    timelineBody.appendChild(chartFrag);
+    tbody.appendChild(tableFrag); timelineBody.appendChild(chartFrag);
 }
 
 function renderKPIs() {
     const salesFilter = document.getElementById('kpiSalesFilter').value;
     const filteredSchedule = (salesFilter === 'ALL') ? SCHEDULE : SCHEDULE.filter(row => row.sales === salesFilter);
-    const totYds = filteredSchedule.reduce((a,b)=>a+b.qty,0);
-    const totRev = filteredSchedule.reduce((a,b)=>a+b.val,0);
-    const totAbs = filteredSchedule.reduce((a,b)=>a+(b.abs || 0), 0);
-    const lateVal = filteredSchedule.filter(x=>x.isLate).reduce((a,b)=>a+b.val,0);
-    document.getElementById('kpiYds').innerText = totYds.toLocaleString();
-    document.getElementById('kpiRev').innerText = '$' + (totRev/1000000).toFixed(2) + 'M';
-    document.getElementById('kpiAbs').innerText = '$' + (totAbs/1000000).toFixed(2) + 'M';
-    document.getElementById('kpiLate').innerText = '$' + lateVal.toLocaleString();
-    if(CHARTS.load) CHARTS.load.destroy();
-    if(CHARTS.rev) CHARTS.rev.destroy();
+    const totYds = filteredSchedule.reduce((a,b)=>a+b.qty,0); const totRev = filteredSchedule.reduce((a,b)=>a+b.val,0); const totAbs = filteredSchedule.reduce((a,b)=>a+(b.abs || 0), 0); const lateVal = filteredSchedule.filter(x=>x.isLate).reduce((a,b)=>a+b.val,0);
+    document.getElementById('kpiYds').innerText = totYds.toLocaleString(); document.getElementById('kpiRev').innerText = '$' + (totRev/1000000).toFixed(2) + 'M'; document.getElementById('kpiAbs').innerText = '$' + (totAbs/1000000).toFixed(2) + 'M'; document.getElementById('kpiLate').innerText = '$' + lateVal.toLocaleString();
+    if(CHARTS.load) CHARTS.load.destroy(); if(CHARTS.rev) CHARTS.rev.destroy();
     const machLoad = {}; const revData = {}; const absData = {};
     filteredSchedule.forEach(r => {
         const allocs = r.allocations || [r.card, r.fin, r.qc];
         allocs.forEach(t => { if(t.mach && t.mach!=='Err' && t.mach !== '-') machLoad[t.mach] = (machLoad[t.mach]||0) + r.qty; });
         const m = new Date(r.globalEnd).toLocaleString('default',{month:'short'});
-        revData[m] = (revData[m]||0) + r.val;
-        absData[m] = (absData[m]||0) + (r.abs || 0);
+        revData[m] = (revData[m]||0) + r.val; absData[m] = (absData[m]||0) + (r.abs || 0);
     });
     CHARTS.load = new Chart(document.getElementById('chartLoad'), { type: 'bar', data: { labels: Object.keys(machLoad), datasets: [{ label: 'Yards', data: Object.values(machLoad), backgroundColor: '#3b82f6' }] }, options: { responsive: true, maintainAspectRatio: false } });
     CHARTS.rev = new Chart(document.getElementById('chartRev'), { type: 'line', data: { labels: Object.keys(revData), datasets: [ { label: 'Revenue', data: Object.values(revData), borderColor: '#22c55e', fill: false, tension: 0.3 }, { label: 'Absorption', data: Object.values(absData), borderColor: '#3b82f6', fill: false, tension: 0.3, borderDash: [5,5] } ] }, options: { responsive: true, maintainAspectRatio: false } });
 }
 
-// ... [Rest of helper functions: addDowntime, renderDowntimeTable, remDT, showTooltip, changeZoom, showModal, switchView, etc. remain the same as v9.0] ...
 function switchView(view) { document.querySelectorAll('[id^="view-"]').forEach(el => el.classList.add('hidden')); document.getElementById('view-'+view).classList.remove('hidden'); document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active')); document.getElementById('nav-'+view).classList.add('active'); if(view==='kpi') renderKPIs(); }
 function showModal(id) { if(id !== 'uploadModal' && USER_ROLE !== 'admin') return alert("Admin only"); document.getElementById(id).style.display = 'flex'; }
 function changeZoom(d) { ZOOM_PX = Math.max(20, Math.min(200, ZOOM_PX + d)); renderAll(); }
@@ -466,7 +261,6 @@ function showTooltip(e, txt) { const tt = document.getElementById('tooltip'); tt
 function addDowntime() { if(USER_ROLE !== 'admin') return alert('Admin only'); const m = document.getElementById('dtMachine').value; const s = document.getElementById('dtStart').value; const e = document.getElementById('dtEnd').value; if (!m || !s || !e) return; DOWNTIME.push({ id: 'temp-'+Date.now(), machine: m, start: new Date(s).getTime(), end: new Date(e).getTime(), reason: 'Planned' }); renderDowntimeTable(); runEngine(); }
 function renderDowntimeTable() { const tb = document.getElementById('dtBody'); tb.innerHTML = DOWNTIME.map((d, i) => `<tr class="border-b border-slate-100"><td class="p-4 font-bold text-slate-700">${d.machine}</td><td class="p-4 text-slate-500">${new Date(d.start).toLocaleString()}</td><td class="p-4 text-slate-500">${new Date(d.end).toLocaleString()}</td><td class="p-4 text-slate-500 italic">${d.reason}</td><td class="p-4 text-center"><button class="text-red-500 hover:text-red-700 admin-only" onclick="remDT(${i})"><i class="fa-solid fa-trash"></i></button></td></tr>`).join(''); }
 function remDT(i) { DOWNTIME.splice(i, 1); renderDowntimeTable(); runEngine(); }
-// Note: applyMassRate, saveOrderEdit, etc. should also be included here as in previous version
 function applyMassRate() { if(USER_ROLE !== 'admin') return alert('Admin only'); const filter = document.getElementById('massRateFilter').value.toUpperCase(); const c = parseFloat(document.getElementById('massRateCard').value); const f = parseFloat(document.getElementById('massRateFin').value); const q = parseFloat(document.getElementById('massRateQC').value); Object.keys(RATES).forEach(k => { if(k.toUpperCase().includes(filter)) { if(c) RATES[k].card = c; if(f) RATES[k].finish = f; if(q) RATES[k].qc = q; } }); document.getElementById('massRateModal').style.display='none'; renderRatesTable(); runEngine(); }
 function saveOrderEdit() { if(USER_ROLE !== 'admin') return alert('Admin only'); const oid = document.getElementById('editOrderId').innerText; const q = parseFloat(document.getElementById('editQty').value); const idx = RAW_ORDERS.findIndex(x => x.id === oid); if(idx > -1) RAW_ORDERS[idx].qty = q; const fc = document.getElementById('forceCard').value; const ff = document.getElementById('forceFin').value; const fq = document.getElementById('forceQC').value; if(fc || ff || fq) { OVERRIDES[oid] = { card: fc, fin: ff, qc: fq }; } else { delete OVERRIDES[oid]; } document.getElementById('editOrderModal').style.display = 'none'; saveLocalState(); runEngine(); }
 function openEditModal(oid) { const o = RAW_ORDERS.find(x => x.id === oid); if(!o) return; document.getElementById('editOrderId').innerText = oid; document.getElementById('editQty').value = o.qty; document.getElementById('editFelt').value = o.felt; const ov = OVERRIDES[oid] || {}; document.getElementById('forceCard').value = ov.card || ""; document.getElementById('forceFin').value = ov.fin || ""; document.getElementById('forceQC').value = ov.qc || ""; document.getElementById('editOrderModal').style.display = 'flex'; }
