@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Alkegen Scheduler v7.5 (Deep Logic)</title>
+  <title>Alkegen Scheduler v8.0 (Integrated Logic)</title>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.tailwindcss.com"></script>
@@ -20,7 +20,7 @@
             <i class="fa-solid fa-industry text-white text-2xl"></i>
         </div>
         <h1 class="text-2xl font-bold text-slate-800">Alkegen Scheduler</h1>
-        <p class="text-slate-500 text-sm">Secure Production System v7.5</p>
+        <p class="text-slate-500 text-sm">Secure Production System v8.0</p>
     </div>
     <div class="login-box">
         <div class="space-y-4">
@@ -141,7 +141,7 @@
             <div class="flex justify-between items-end mb-6">
                 <div>
                     <h2 class="text-2xl font-bold text-slate-800">Dynamic Routing Graph</h2>
-                    <p class="text-sm text-slate-500">Priority: First machine listed is preferred. Engine will try first option before falling back.</p>
+                    <p class="text-sm text-slate-500">Priority: First machine listed is preferred. QC Lab is automatically appended as final step.</p>
                 </div>
                 <button onclick="document.getElementById('massRouteModal').style.display='flex'" class="admin-only px-4 py-2 bg-slate-100 border border-slate-300 text-slate-700 font-bold rounded hover:bg-white transition flex items-center gap-2">
                     <i class="fa-solid fa-bolt"></i> Mass Update Routes
@@ -165,8 +165,16 @@
     <div id="view-kpi" class="flex-1 hidden bg-white p-8 fade-in overflow-auto">
         <div class="max-w-7xl mx-auto space-y-8">
             <div class="flex justify-between items-center">
-                <h2 class="text-2xl font-bold text-slate-800">Operational Financials</h2>
-                <div class="text-xs text-slate-400">Real-time projection based on Schedule</div>
+                <div>
+                    <h2 class="text-2xl font-bold text-slate-800">Operational Financials</h2>
+                    <div class="text-xs text-slate-400">Real-time projection based on Schedule</div>
+                </div>
+                <div class="flex items-center gap-3">
+                    <label class="text-xs font-bold text-slate-500 uppercase">Sales Filter:</label>
+                    <select id="kpiSalesFilter" onchange="renderKPIs()" class="bg-white border border-slate-300 rounded p-2 text-sm w-48 shadow-sm">
+                        <option value="ALL">All Sales Teams</option>
+                    </select>
+                </div>
             </div>
             
             <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -288,11 +296,26 @@
         let schedule = [];
         let now = simStart || new Date().getTime();
         let machineState = {};
-        // Flatten downtime for easier lookups
-        // Sort downtimes by start time
+        
+        // 1. DOWNTIME FLATTENING (Sorting and Merging)
         let activeDowntime = [...downtime].sort((a,b) => a.start - b.start);
 
-        // 0. MATRIX CHANGEOVER LOGIC
+        // Generate Staffing Downtime
+        for(let d=0; d<90; d++) {
+            const dayStart = now + (d * 86400000);
+            const midnight = new Date(dayStart).setHours(0,0,0,0);
+            Object.keys(staffing).forEach(machName => {
+                const avail = staffing[machName];
+                if(!avail) return;
+                // Shift 1 (08-16), Shift 2 (16-24), Shift 3 (00-08)
+                if(!avail[0]) activeDowntime.push({ machine: machName, start: midnight + (8*3600000), end: midnight + (16*3600000), reason: 'Staffing' });
+                if(!avail[1]) activeDowntime.push({ machine: machName, start: midnight + (16*3600000), end: midnight + (24*3600000), reason: 'Staffing' });
+                if(!avail[2]) activeDowntime.push({ machine: machName, start: midnight, end: midnight + (8*3600000), reason: 'Staffing' });
+            });
+        }
+        activeDowntime.sort((a,b) => a.start - b.start);
+
+        // 0. MATRIX CHANGEOVER
         const FIBER_MATRIX = {
             'POLYESTER': { 'ARAMID': 8, 'PPS': 4 },
             'ARAMID': { 'POLYESTER': 12, 'PPS': 6 },
@@ -307,26 +330,6 @@
             if (FIBER_MATRIX[lf] && FIBER_MATRIX[lf][nf]) return FIBER_MATRIX[lf][nf] * 3600000;
             return 4 * 3600000;
         }
-
-        // 1. STAFFING DOWNTIME (Dynamic Generation)
-        // Generate downtime for 90 days out to be safe
-        for(let d=0; d<90; d++) {
-            const dayStart = now + (d * 86400000);
-            const midnight = new Date(dayStart).setHours(0,0,0,0);
-            Object.keys(staffing).forEach(machName => {
-                const avail = staffing[machName];
-                if(!avail) return;
-                // Shift 1 (08-16), Shift 2 (16-24), Shift 3 (00-08)
-                // If Shift 1 unchecked: downtime 08:00 to 16:00
-                if(!avail[0]) activeDowntime.push({ machine: machName, start: midnight + (8*3600000), end: midnight + (16*3600000), reason: 'Staffing' });
-                // If Shift 2 unchecked: downtime 16:00 to 24:00
-                if(!avail[1]) activeDowntime.push({ machine: machName, start: midnight + (16*3600000), end: midnight + (24*3600000), reason: 'Staffing' });
-                // If Shift 3 unchecked: downtime 00:00 to 08:00
-                if(!avail[2]) activeDowntime.push({ machine: machName, start: midnight, end: midnight + (8*3600000), reason: 'Staffing' });
-            });
-        }
-        // Re-sort after adding staffing
-        activeDowntime.sort((a,b) => a.start - b.start);
 
         MACHINES.forEach(m => { machineState[m] = { time: now, lastFelt: null, lastFiber: null }; });
 
@@ -344,16 +347,18 @@
             queue.sort((a,b) => (a.rtsDate || 0) - (b.rtsDate || 0));
         }
 
-        // 3. SCHEDULING
+        // 3. SCHEDULING LOOP
         queue.forEach(ord => {
             const r = rates[ord.felt] || Object.values(rates)[0] || {card:250, finish:700, qc:400};
             let statusUpper = (ord.status || '').toUpperCase();
             
+            // Raw Material Delay
             let materialReadyTime = now;
             if (statusUpper.includes('WAITING RAW') || statusUpper.includes('MATERIAL')) {
                 materialReadyTime = now + (7 * 86400000);
             }
 
+            // Routing Construction
             let routeSteps = routes[ord.felt];
             if (!routeSteps || routeSteps.length === 0) {
                  routeSteps = [
@@ -362,7 +367,15 @@
                     { step: 3, pool: MACHINES.filter(m => m.includes('QC')) }
                  ];
             }
+            
+            // CRITICAL LOGIC: Ensure QC Lab is ALWAYS the final step
+            const lastStep = routeSteps[routeSteps.length - 1];
+            const hasQCLab = lastStep && lastStep.pool.some(m => m.toUpperCase().includes('LAB'));
+            if (!hasQCLab) {
+                routeSteps = [...routeSteps, { step: 99, pool: ['QC Lab'] }];
+            }
 
+            // WIP Netting
             let startStepIndex = 0;
             let currentReady = materialReadyTime;
             let wipQty = ord.wip || 0;
@@ -377,7 +390,8 @@
             } else if(statusUpper.includes('WAITING BRUCKNER')) {
                 startStepIndex = 1;
             } else if(statusUpper.includes('WAITING QC')) {
-                startStepIndex = routeSteps.length - 1;
+                startStepIndex = routeSteps.findIndex(s => s.pool.some(m => m.includes('QC')));
+                if (startStepIndex === -1) startStepIndex = routeSteps.length - 2; // Fallback
             }
 
             let allocations = [];
@@ -394,10 +408,9 @@
                 let stepQty = (i === startStepIndex && forcedFirstStep) ? remainingQty : ord.qty;
                 let stepDurHrs = stepQty / stepRate;
 
-                // Move times
+                // Move times (Transfer delay)
                 if(i > startStepIndex) {
-                    if(poolStr.includes('QC')) currentReady += 1800000;
-                    else currentReady += 3600000;
+                    currentReady += 3600000; // 1 hr transfer
                 }
 
                 if(overrides[ord.id]) {
@@ -408,11 +421,13 @@
 
                 let forceParams = (i === startStepIndex) ? forcedFirstStep : null;
                 
-                // --- CALL ALLOCATE ---
+                // DEPENDENCY CHAIN: 'currentReady' implies the previous step is DONE.
                 const res = allocate(pool, currentReady, stepDurHrs, ord.felt, ord.fiber, forceParams);
                 
                 allocations.push({ stepName: step.step, ...res });
-                currentReady = res.end;
+                
+                // The NEXT step cannot start until THIS step finishes
+                currentReady = res.end; 
             }
 
             const finalEnd = allocations.length > 0 ? allocations[allocations.length-1].end : now;
@@ -425,7 +440,7 @@
         });
 
         // ----------------------------------------------------
-        //  CORE ALLOCATION LOGIC (Shift-Aware & Downtime-Aware)
+        //  ROBUST ALLOCATOR
         // ----------------------------------------------------
         function allocate(pool, readyTime, durHrs, felt, fiber, forceParams) {
             if(!pool || pool.length === 0) return { mach:'Err', start:readyTime, end:readyTime };
@@ -434,8 +449,6 @@
             const PATIENCE_THRESHOLD = 24 * 3600000;
 
             if (forceParams) {
-                // If forced, we assume it's already running. 
-                // We calculate finish time based on remaining duration, respecting downtimes starting NOW.
                 const mName = pool[0]; 
                 const start = forceParams.startAt;
                 const end = calculateFinishTime(mName, start, durMs);
@@ -447,8 +460,9 @@
                 return { mach: mName, start: start, end: end };
             }
 
-            // Calculate 'Available to Finish' for each machine in pool
+            // Calculate options
             let options = pool.map(mName => {
+                // QC LAB: Infinite capacity, instant throughput (simulated)
                 if (mName.toUpperCase().includes('LAB')) {
                      const labRateMult = 10; 
                      const labDur = durMs / labRateMult;
@@ -457,26 +471,25 @@
 
                 const mState = machineState[mName] || { time: now, lastFelt: null, lastFiber: null };
                 
-                // 1. Determine Earliest Start Time (Setup included)
+                // 1. Earliest Start (Machine Free OR Previous Step Done)
                 let start = Math.max(mState.time, readyTime, now);
                 
+                // 2. Changeover
                 if(mState.lastFelt) {
                     if (mState.lastFelt === felt) { start += 0; } 
                     else { start += getChangeoverDuration(mState.lastFiber, fiber); }
                 }
 
-                // 2. Find Next Available Slot (Jumping over immediate downtime)
-                // If 'start' lands exactly inside a downtime block, push it out.
-                // NOTE: calculateFinishTime handles interrupts, but we need a valid start first.
+                // 3. Jump over Downtime (Start Logic)
                 start = findNextValidStart(mName, start);
 
-                // 3. Calculate Finish Time (Walking through downtimes)
+                // 4. Calculate End (Duration Logic)
                 const end = calculateFinishTime(mName, start, durMs);
 
                 return { mach: mName, start: start, end: end };
             });
 
-            // PREFERENCE LOGIC
+            // Preference: Try first machine. If wait is < 24h, take it.
             const preferredOption = options[0];
             const bestPossibleTime = Math.min(...options.map(o => o.end));
             
@@ -499,20 +512,21 @@
             return selectedOption;
         }
 
-        // Helper: Find first moment 'start' is not inside a downtime block
+        // Helper: Find valid start time (skipping downtime blocks)
         function findNextValidStart(machine, proposedStart) {
             let t = proposedStart;
-            // Filter downtimes for this machine
+            // Get sorted downtime for this machine
             const machineDT = activeDowntime.filter(d => d.machine === machine);
             
             let inConflict = true;
             while(inConflict) {
                 inConflict = false;
                 for(let dt of machineDT) {
-                    // If t is inside a block
+                    // Check if 't' falls inside a block
                     if(t >= dt.start && t < dt.end) {
-                        t = dt.end; // Jump to end of block
-                        inConflict = true; // Re-check in case we landed in *another* block
+                        t = dt.end; // Jump to end
+                        inConflict = true; 
+                        // Break to re-scan from the new 't' (handling adjacent blocks)
                         break; 
                     }
                 }
@@ -520,36 +534,30 @@
             return t;
         }
 
-        // Helper: Calculate finish time by "burning" duration only during valid windows
+        // Helper: Calculate finish by burning duration only during uptime
         function calculateFinishTime(machine, startTime, durationMs) {
             let remaining = durationMs;
             let current = startTime;
-            
-            // Optimization: Filter relevant downtimes ahead of start
             const machineDT = activeDowntime.filter(d => d.machine === machine && d.end > startTime);
 
-            // We iterate until duration is consumed. 
-            // Safety break to prevent infinite loops if config is bad
             let loops = 0;
-            while(remaining > 0 && loops < 1000) {
-                // Find next downtime block that starts after 'current'
-                const nextDT = machineDT.find(d => d.start > current); // Assumes sorted
+            while(remaining > 0 && loops < 2000) {
+                // Find next downtime that starts AFTER current
+                const nextDT = machineDT.find(d => d.start > current); 
                 
                 if (!nextDT) {
-                    // No more downtimes ever? Just finish it.
                     return current + remaining;
                 }
 
-                // Time until next downtime
                 const timeToDT = nextDT.start - current;
 
                 if (timeToDT >= remaining) {
-                    // We can finish before the next downtime hits
                     return current + remaining;
                 } else {
-                    // We run until the downtime hits
+                    // Burn available time
                     remaining -= timeToDT;
-                    current = nextDT.end; // Jump clock to end of downtime
+                    // Jump over downtime
+                    current = nextDT.end;
                 }
                 loops++;
             }
