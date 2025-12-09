@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Alkegen Scheduler v10 (Shift Planner)</title>
+  <title>Alkegen Scheduler v11.0 (Hybrid Core)</title>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.tailwindcss.com"></script>
@@ -20,18 +20,12 @@
             <i class="fa-solid fa-industry text-white text-2xl"></i>
         </div>
         <h1 class="text-2xl font-bold text-slate-800">Alkegen Scheduler</h1>
-        <p class="text-slate-500 text-sm">Secure Production System v10.0</p>
+        <p class="text-slate-500 text-sm">Production System v11.0</p>
     </div>
     <div class="login-box">
         <div class="space-y-4">
-            <div>
-                <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Email</label>
-                <input type="email" id="email" class="w-full border border-slate-300 rounded p-2 text-sm" placeholder="email@alkegen.com">
-            </div>
-            <div>
-                <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Password</label>
-                <input type="password" id="password" class="w-full border border-slate-300 rounded p-2 text-sm" placeholder="••••••••">
-            </div>
+            <div><label class="block text-xs font-bold text-slate-500 uppercase mb-1">Email</label><input type="email" id="email" class="w-full border border-slate-300 rounded p-2 text-sm" placeholder="email@alkegen.com"></div>
+            <div><label class="block text-xs font-bold text-slate-500 uppercase mb-1">Password</label><input type="password" id="password" class="w-full border border-slate-300 rounded p-2 text-sm" placeholder="••••••••"></div>
             <button onclick="handleLogin()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded transition shadow-md">Sign In</button>
             <p id="loginError" class="text-red-500 text-xs text-center hidden"></p>
         </div>
@@ -41,17 +35,12 @@
 <div id="mainApp" class="app-container hidden">
     <header>
         <div class="flex items-center gap-4">
-            <div class="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center shadow-md">
-                <i class="fa-solid fa-industry text-white"></i>
-            </div>
+            <div class="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center shadow-md"><i class="fa-solid fa-industry text-white"></i></div>
             <div>
                 <h1 class="font-bold text-lg text-slate-800 leading-tight">Alkegen <span class="text-blue-600">Production</span></h1>
-                <div class="flex items-center gap-2 text-xs text-slate-500 font-medium">
-                    <span class="w-2 h-2 rounded-full bg-green-500"></span> <span id="userRoleBadge">Viewer</span> Mode
-                </div>
+                <div class="flex items-center gap-2 text-xs text-slate-500 font-medium"><span class="w-2 h-2 rounded-full bg-green-500"></span> <span id="userRoleBadge">Viewer</span> Mode</div>
             </div>
         </div>
-
         <nav class="nav-group">
             <button onclick="switchView('gantt')" id="nav-gantt" class="nav-btn active"><i class="fa-solid fa-layer-group"></i>Schedule</button>
             <button onclick="switchView('sequencing')" id="nav-sequencing" class="nav-btn"><i class="fa-solid fa-route"></i>Sequencing</button>
@@ -60,25 +49,17 @@
             <button onclick="switchView('kpi')" id="nav-kpi" class="nav-btn"><i class="fa-solid fa-chart-pie"></i>Analytics</button>
             <button onclick="switchView('downtime')" id="nav-downtime" class="nav-btn"><i class="fa-solid fa-triangle-exclamation"></i>Downtime</button>
         </nav>
-
         <div class="flex items-center gap-3">
             <span id="userEmailDisplay" class="text-xs text-slate-400 mr-2 font-mono"></span>
-            <button onclick="showModal('uploadModal')" class="admin-only px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-lg shadow-sm transition flex items-center gap-2">
-                <i class="fa-solid fa-cloud-arrow-up"></i> Import Data
-            </button>
-            <button onclick="handleLogout()" class="w-9 h-9 flex items-center justify-center text-slate-400 hover:bg-slate-100 rounded-lg border border-slate-200 transition" title="Logout">
-                <i class="fa-solid fa-right-from-bracket"></i>
-            </button>
+            <button onclick="showModal('uploadModal')" class="admin-only px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-lg shadow-sm transition flex items-center gap-2"><i class="fa-solid fa-cloud-arrow-up"></i> Import Data</button>
+            <button onclick="handleLogout()" class="w-9 h-9 flex items-center justify-center text-slate-400 hover:bg-slate-100 rounded-lg border border-slate-200 transition" title="Logout"><i class="fa-solid fa-right-from-bracket"></i></button>
         </div>
     </header>
 
     <div id="view-gantt" class="flex-1 flex flex-col relative fade-in overflow-hidden">
         <div class="h-14 border-b border-slate-200 bg-white flex items-center justify-between px-6 flex-shrink-0 z-40">
             <div class="flex items-center gap-6">
-                <div class="flex flex-col">
-                    <label class="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Start Date</label>
-                    <input type="date" id="simDate" class="text-xs border-none bg-transparent font-bold text-slate-700 p-0 focus:ring-0 cursor-pointer hover:text-blue-600 transition" onchange="runEngine()">
-                </div>
+                <div class="flex flex-col"><label class="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Start Date</label><input type="date" id="simDate" class="text-xs border-none bg-transparent font-bold text-slate-700 p-0 focus:ring-0 cursor-pointer hover:text-blue-600 transition" onchange="runEngine()"></div>
                 <div class="h-8 w-px bg-slate-200"></div>
                 <div class="flex items-center gap-3 group relative">
                     <label class="relative inline-flex items-center cursor-pointer">
@@ -88,10 +69,7 @@
                     </label>
                 </div>
                 <div class="h-8 w-px bg-slate-200"></div>
-                <div class="text-xs font-mono">
-                    <span class="text-slate-500">ENGINE: </span>
-                    <span id="engineStatus" class="text-green-600 font-bold">READY</span>
-                </div>
+                <div class="text-xs font-mono"><span class="text-slate-500">ENGINE: </span><span id="engineStatus" class="text-green-600 font-bold">READY</span></div>
             </div>
             <div class="flex items-center gap-4">
                 <div class="flex items-center bg-slate-100 rounded-lg p-1 border border-slate-200">
@@ -101,154 +79,63 @@
                 </div>
             </div>
         </div>
-
         <div class="gantt-header-row">
             <div class="sidebar-header">
-                <table class="data-table">
-                    <thead>
-                        <tr>
-                            <th style="width: 80px">Status</th>
-                            <th style="width: 90px">Order</th>
-                            <th style="width: 130px">Felt Code</th>
-                            <th style="width: 100px">Fiber</th>
-                            <th style="width: 100px">Status</th>
-                            <th style="width: 50px; text-align: right">Bal</th>
-                        </tr>
-                    </thead>
-                </table>
+                <table class="data-table"><thead><tr><th style="width: 80px">Status</th><th style="width: 90px">Order</th><th style="width: 130px">Felt Code</th><th style="width: 100px">Fiber</th><th style="width: 100px">Status</th><th style="width: 50px; text-align: right">Bal</th></tr></thead></table>
             </div>
-            <div class="timeline-header-wrapper" id="timelineHeaderWrapper">
-                <div id="timelineHeader" class="timeline-header"></div>
-            </div>
+            <div class="timeline-header-wrapper" id="timelineHeaderWrapper"><div id="timelineHeader" class="timeline-header"></div></div>
         </div>
-
         <div class="gantt-wrapper">
             <div class="gantt-scroll-container" id="mainScroll">
-                <div class="gantt-sidebar">
-                    <table class="data-table">
-                        <tbody id="taskTableBody"></tbody>
-                    </table>
-                </div>
-                <div class="gantt-chart" id="ganttChart">
-                    <div id="timelineBody" class="pb-24"></div>
-                </div>
+                <div class="gantt-sidebar"><table class="data-table"><tbody id="taskTableBody"></tbody></table></div>
+                <div class="gantt-chart" id="ganttChart"><div id="timelineBody" class="pb-24"></div></div>
             </div>
         </div>
     </div>
 
     <div id="view-staffing" class="flex-1 hidden bg-white p-8 fade-in overflow-auto">
         <div class="max-w-7xl mx-auto space-y-8">
-            
-            <div class="flex justify-between items-center">
-                <h2 class="text-2xl font-bold text-slate-800">Shift Planning & Capacity</h2>
-                <button onclick="runEngine()" class="admin-only px-6 py-2 bg-green-600 text-white font-bold rounded-lg shadow hover:bg-green-700 transition">
-                    <i class="fa-solid fa-rotate mr-2"></i> Apply & Re-Schedule
-                </button>
-            </div>
-
+            <div class="flex justify-between items-center"><h2 class="text-2xl font-bold text-slate-800">Shift Planning & Capacity</h2><button onclick="runEngine()" class="admin-only px-6 py-2 bg-green-600 text-white font-bold rounded-lg shadow hover:bg-green-700 transition"><i class="fa-solid fa-rotate mr-2"></i> Apply & Re-Schedule</button></div>
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
                     <h3 class="font-bold text-slate-700 mb-4 flex items-center gap-2"><i class="fa-solid fa-clock text-blue-500"></i> Shift Definitions</h3>
                     <div class="space-y-3">
-                        <div class="flex items-center gap-4 bg-slate-50 p-2 rounded">
-                            <span class="w-16 font-bold text-sm">Shift 1</span>
-                            <input type="number" id="shift1Start" value="8" class="w-16 border rounded p-1 text-sm text-center" onchange="updateShiftConfig()">
-                            <span class="text-xs text-slate-400">to</span>
-                            <span class="text-sm font-mono font-bold" id="shift1EndDisplay">16:00</span>
-                            <span class="text-xs text-slate-400 ml-auto">Duration: 8h</span>
-                        </div>
-                        <div class="flex items-center gap-4 bg-slate-50 p-2 rounded">
-                            <span class="w-16 font-bold text-sm">Shift 2</span>
-                            <input type="number" id="shift2Start" value="16" class="w-16 border rounded p-1 text-sm text-center" onchange="updateShiftConfig()">
-                            <span class="text-xs text-slate-400">to</span>
-                            <span class="text-sm font-mono font-bold" id="shift2EndDisplay">00:00</span>
-                            <span class="text-xs text-slate-400 ml-auto">Duration: 8h</span>
-                        </div>
-                        <div class="flex items-center gap-4 bg-slate-50 p-2 rounded">
-                            <span class="w-16 font-bold text-sm">Shift 3</span>
-                            <input type="number" id="shift3Start" value="0" class="w-16 border rounded p-1 text-sm text-center" onchange="updateShiftConfig()">
-                            <span class="text-xs text-slate-400">to</span>
-                            <span class="text-sm font-mono font-bold" id="shift3EndDisplay">08:00</span>
-                            <span class="text-xs text-slate-400 ml-auto">Duration: 8h</span>
-                        </div>
+                        <div class="flex items-center gap-4 bg-slate-50 p-2 rounded"><span class="w-16 font-bold text-sm">Shift 1</span><input type="number" id="shift1Start" value="8" class="w-16 border rounded p-1 text-sm text-center" onchange="updateShiftConfig()"><span class="text-xs text-slate-400">to</span><span class="text-sm font-mono font-bold" id="shift1EndDisplay">16:00</span><span class="text-xs text-slate-400 ml-auto">Duration: 8h</span></div>
+                        <div class="flex items-center gap-4 bg-slate-50 p-2 rounded"><span class="w-16 font-bold text-sm">Shift 2</span><input type="number" id="shift2Start" value="16" class="w-16 border rounded p-1 text-sm text-center" onchange="updateShiftConfig()"><span class="text-xs text-slate-400">to</span><span class="text-sm font-mono font-bold" id="shift2EndDisplay">00:00</span><span class="text-xs text-slate-400 ml-auto">Duration: 8h</span></div>
+                        <div class="flex items-center gap-4 bg-slate-50 p-2 rounded"><span class="w-16 font-bold text-sm">Shift 3</span><input type="number" id="shift3Start" value="0" class="w-16 border rounded p-1 text-sm text-center" onchange="updateShiftConfig()"><span class="text-xs text-slate-400">to</span><span class="text-sm font-mono font-bold" id="shift3EndDisplay">08:00</span><span class="text-xs text-slate-400 ml-auto">Duration: 8h</span></div>
                     </div>
                 </div>
-
                 <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
-                    <h3 class="font-bold text-slate-700 mb-4 flex items-center gap-2"><i class="fa-solid fa-calendar-xmark text-red-500"></i> Plant-Wide Holidays (Days Off)</h3>
-                    <div class="flex gap-2 mb-4">
-                        <input type="date" id="holidayInput" class="border rounded p-2 text-sm flex-1">
-                        <button onclick="addHoliday()" class="bg-red-100 text-red-600 font-bold px-4 rounded hover:bg-red-200 text-sm">Add</button>
-                    </div>
+                    <h3 class="font-bold text-slate-700 mb-4 flex items-center gap-2"><i class="fa-solid fa-calendar-xmark text-red-500"></i> Plant-Wide Holidays</h3>
+                    <div class="flex gap-2 mb-4"><input type="date" id="holidayInput" class="border rounded p-2 text-sm flex-1"><button onclick="addHoliday()" class="bg-red-100 text-red-600 font-bold px-4 rounded hover:bg-red-200 text-sm">Add</button></div>
                     <div id="holidayList" class="flex flex-wrap gap-2 max-h-32 overflow-y-auto"></div>
                 </div>
             </div>
-
             <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
                 <h3 class="font-bold text-slate-700 mb-4 flex items-center gap-2"><i class="fa-solid fa-calendar-days text-purple-500"></i> Monthly Planning / Exceptions</h3>
-                <p class="text-xs text-slate-500 mb-4">Override standard staffing for specific dates (e.g., Weekend Overtime, Maintenance Days).</p>
-                
+                <p class="text-xs text-slate-500 mb-4">Select "All Shifts Unchecked" to turn a machine off completely for a date range.</p>
                 <div class="flex flex-wrap items-end gap-3 mb-4 bg-slate-50 p-4 rounded-lg border border-slate-100">
-                    <div>
-                        <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Machine</label>
-                        <select id="exMachine" class="border rounded p-2 text-sm w-40"></select>
-                    </div>
-                    <div>
-                        <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Start Date</label>
-                        <input type="date" id="exStart" class="border rounded p-2 text-sm">
-                    </div>
-                    <div>
-                        <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">End Date</label>
-                        <input type="date" id="exEnd" class="border rounded p-2 text-sm">
-                    </div>
-                    <div class="flex gap-2 items-center pb-2">
-                        <label><input type="checkbox" id="exS1" checked> S1</label>
-                        <label><input type="checkbox" id="exS2" checked> S2</label>
-                        <label><input type="checkbox" id="exS3" checked> S3</label>
-                    </div>
+                    <div><label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Machine</label><select id="exMachine" class="border rounded p-2 text-sm w-40"></select></div>
+                    <div><label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Start Date</label><input type="date" id="exStart" class="border rounded p-2 text-sm"></div>
+                    <div><label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">End Date</label><input type="date" id="exEnd" class="border rounded p-2 text-sm"></div>
+                    <div class="flex gap-2 items-center pb-2"><label><input type="checkbox" id="exS1" checked> S1</label><label><input type="checkbox" id="exS2" checked> S2</label><label><input type="checkbox" id="exS3" checked> S3</label></div>
                     <button onclick="addException()" class="bg-purple-600 text-white font-bold px-4 py-2 rounded text-sm hover:bg-purple-700 shadow">Set Schedule</button>
                 </div>
-
-                <div class="border rounded-lg overflow-hidden max-h-60 overflow-y-auto">
-                    <table class="w-full text-sm text-left">
-                        <thead class="bg-slate-100 text-slate-500 font-bold text-xs uppercase sticky top-0">
-                            <tr>
-                                <th class="p-3">Machine</th>
-                                <th class="p-3">Date Range</th>
-                                <th class="p-3 text-center">Shift 1</th>
-                                <th class="p-3 text-center">Shift 2</th>
-                                <th class="p-3 text-center">Shift 3</th>
-                                <th class="p-3 text-center">Action</th>
-                            </tr>
-                        </thead>
-                        <tbody id="exceptionBody" class="divide-y divide-slate-100"></tbody>
-                    </table>
-                </div>
+                <div class="border rounded-lg overflow-hidden max-h-60 overflow-y-auto"><table class="w-full text-sm text-left"><thead class="bg-slate-100 text-slate-500 font-bold text-xs uppercase sticky top-0"><tr><th class="p-3">Machine</th><th class="p-3">Date Range</th><th class="p-3 text-center">Shift 1</th><th class="p-3 text-center">Shift 2</th><th class="p-3 text-center">Shift 3</th><th class="p-3 text-center">Action</th></tr></thead><tbody id="exceptionBody" class="divide-y divide-slate-100"></tbody></table></div>
             </div>
-
             <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-6 opacity-75 hover:opacity-100 transition">
                 <h3 class="font-bold text-slate-700 mb-4 text-sm uppercase tracking-wide">Default Weekly Pattern (Fallback)</h3>
-                <div class="overflow-x-auto">
-                    <table class="w-full text-sm text-left text-slate-600">
-                        <thead class="bg-slate-50 text-slate-500 font-bold border-b border-slate-200">
-                            <tr>
-                                <th class="p-4">Machine</th>
-                                <th class="p-4 text-center">Shift 1</th>
-                                <th class="p-4 text-center">Shift 2</th>
-                                <th class="p-4 text-center">Shift 3</th>
-                            </tr>
-                        </thead>
-                        <tbody id="staffingTableBody" class="divide-y divide-slate-100"></tbody>
-                    </table>
-                </div>
+                <div class="overflow-x-auto"><table class="w-full text-sm text-left text-slate-600"><thead class="bg-slate-50 text-slate-500 font-bold border-b border-slate-200"><tr><th class="p-4">Machine</th><th class="p-4 text-center">Shift 1</th><th class="p-4 text-center">Shift 2</th><th class="p-4 text-center">Shift 3</th></tr></thead><tbody id="staffingTableBody" class="divide-y divide-slate-100"></tbody></table></div>
             </div>
-
         </div>
     </div>
 
-    <div id="view-sequencing" class="flex-1 hidden bg-white p-8 fade-in overflow-auto"><div class="max-w-7xl mx-auto"><div class="flex justify-between items-end mb-6"><div><h2 class="text-2xl font-bold text-slate-800">Dynamic Routing Graph</h2><p class="text-sm text-slate-500">Logic Enforced: Carding -> Finishing -> QC -> QC Lab (Auto-Appended)</p></div><button onclick="document.getElementById('massRouteModal').style.display='flex'" class="admin-only px-4 py-2 bg-slate-100 border border-slate-300 text-slate-700 font-bold rounded hover:bg-white transition flex items-center gap-2"><i class="fa-solid fa-bolt"></i> Mass Update Routes</button></div><div class="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden"><table class="w-full text-sm text-left text-slate-600"><thead class="bg-slate-50 text-slate-500 font-bold border-b border-slate-200"><tr><th class="p-4">Felt Code</th><th class="p-4">Route Steps (Order -> Machine Pool)</th><th class="p-4 w-20 text-center">Action</th></tr></thead><tbody id="sequencingTableBody" class="divide-y divide-slate-100"></tbody></table></div></div></div>
+    <div id="view-sequencing" class="flex-1 hidden bg-white p-8 fade-in overflow-auto"><div class="max-w-7xl mx-auto"><div class="flex justify-between items-end mb-6"><div><h2 class="text-2xl font-bold text-slate-800">Dynamic Routing Graph</h2><p class="text-sm text-slate-500">Logic Enforced: Carding -> Finishing -> QC -> QC Lab</p></div><button onclick="document.getElementById('massRouteModal').style.display='flex'" class="admin-only px-4 py-2 bg-slate-100 border border-slate-300 text-slate-700 font-bold rounded hover:bg-white transition flex items-center gap-2"><i class="fa-solid fa-bolt"></i> Mass Update Routes</button></div><div class="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden"><table class="w-full text-sm text-left text-slate-600"><thead class="bg-slate-50 text-slate-500 font-bold border-b border-slate-200"><tr><th class="p-4">Felt Code</th><th class="p-4">Route Steps (Order -> Machine Pool)</th><th class="p-4 w-20 text-center">Action</th></tr></thead><tbody id="sequencingTableBody" class="divide-y divide-slate-100"></tbody></table></div></div></div>
+    
     <div id="view-rates" class="flex-1 hidden bg-white p-8 fade-in overflow-auto"><div class="max-w-6xl mx-auto"><div class="flex justify-between items-end mb-6"><h2 class="text-2xl font-bold text-slate-800">Rates & Changeovers</h2><div class="flex gap-3 admin-only"><button onclick="document.getElementById('massRateModal').style.display='flex'" class="px-4 py-2 bg-slate-100 border border-slate-300 text-slate-700 font-bold rounded hover:bg-white transition">Mass Update</button><button onclick="addNewRateRow()" class="px-4 py-2 bg-blue-600 text-white font-bold rounded shadow hover:bg-blue-700">+ Add Rate</button></div></div><div class="bg-white rounded-lg border border-slate-200 overflow-hidden shadow-sm"><table class="w-full text-sm text-left text-slate-600"><thead class="bg-slate-50 text-slate-500 font-bold border-b border-slate-200"><tr><th class="p-4 w-1/3">Felt Code</th><th class="p-4 text-right">Carding (yds/hr)</th><th class="p-4 text-right">Finishing (yds/hr)</th><th class="p-4 text-right">QC (yds/hr)</th><th class="p-4 w-20 text-center">Actions</th></tr></thead><tbody id="ratesTableBody" class="divide-y divide-slate-100"></tbody></table></div></div></div>
-    <div id="view-kpi" class="flex-1 hidden bg-white p-8 fade-in overflow-auto"><div class="max-w-7xl mx-auto space-y-8"><div class="flex justify-between items-center"><div><h2 class="text-2xl font-bold text-slate-800">Operational Financials</h2><div class="text-xs text-slate-400">Real-time projection based on Schedule</div></div><div class="flex items-center gap-3"><label class="text-xs font-bold text-slate-500 uppercase">Sales Filter:</label><select id="kpiSalesFilter" onchange="renderKPIs()" class="bg-white border border-slate-300 rounded p-2 text-sm w-48 shadow-sm"><option value="ALL">All Sales Teams</option></select></div></div><div class="grid grid-cols-1 md:grid-cols-4 gap-6"><div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden group"><div class="text-xs font-bold text-slate-400 uppercase tracking-wide">Throughput (Yds)</div><div class="text-3xl font-bold text-slate-800 mt-2" id="kpiYds">0</div><div class="absolute right-4 top-6 text-slate-100 text-5xl group-hover:scale-110 transition opacity-50"><i class="fa-solid fa-ruler-horizontal"></i></div></div><div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden"><div class="text-xs font-bold text-slate-400 uppercase tracking-wide">Projected Revenue</div><div class="text-3xl font-bold text-green-600 mt-2" id="kpiRev">$0</div><div class="absolute right-4 top-6 text-green-50 text-5xl opacity-50"><i class="fa-solid fa-sack-dollar"></i></div></div><div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden"><div class="text-xs font-bold text-slate-400 uppercase tracking-wide">Std Absorption</div><div class="text-3xl font-bold text-blue-600 mt-2" id="kpiAbs">$0</div><div class="text-[10px] text-blue-400 mt-1">Overhead Recovery</div><div class="absolute right-4 top-6 text-blue-50 text-5xl opacity-50"><i class="fa-solid fa-industry"></i></div></div><div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden"><div class="text-xs font-bold text-slate-400 uppercase tracking-wide">Late Revenue Risk</div><div class="text-3xl font-bold text-red-600 mt-2" id="kpiLate">$0</div><div class="absolute right-4 top-6 text-red-50 text-5xl opacity-50"><i class="fa-solid fa-triangle-exclamation"></i></div></div></div><div class="grid grid-cols-1 lg:grid-cols-2 gap-6 h-96"><div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col"><h3 class="text-sm font-bold text-slate-600 mb-6">Machine Load Balance</h3><div class="flex-grow relative"><canvas id="chartLoad"></canvas></div></div><div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col"><h3 class="text-sm font-bold text-slate-600 mb-6">Financial Forecast (Sales vs Absorption)</h3><div class="flex-grow relative"><canvas id="chartRev"></canvas></div></div></div></div></div>
+    
+    <div id="view-kpi" class="flex-1 hidden bg-white p-8 fade-in overflow-auto"><div class="max-w-7xl mx-auto space-y-8"><div class="flex justify-between items-center"><div><h2 class="text-2xl font-bold text-slate-800">Operational Financials</h2><div class="text-xs text-slate-400">Real-time projection</div></div><div class="flex items-center gap-3"><label class="text-xs font-bold text-slate-500 uppercase">Sales Filter:</label><select id="kpiSalesFilter" onchange="renderKPIs()" class="bg-white border border-slate-300 rounded p-2 text-sm w-48 shadow-sm"><option value="ALL">All Sales Teams</option></select></div></div><div class="grid grid-cols-1 md:grid-cols-4 gap-6"><div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden group"><div class="text-xs font-bold text-slate-400 uppercase tracking-wide">Throughput (Yds)</div><div class="text-3xl font-bold text-slate-800 mt-2" id="kpiYds">0</div><div class="absolute right-4 top-6 text-slate-100 text-5xl group-hover:scale-110 transition opacity-50"><i class="fa-solid fa-ruler-horizontal"></i></div></div><div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden"><div class="text-xs font-bold text-slate-400 uppercase tracking-wide">Projected Revenue</div><div class="text-3xl font-bold text-green-600 mt-2" id="kpiRev">$0</div><div class="absolute right-4 top-6 text-green-50 text-5xl opacity-50"><i class="fa-solid fa-sack-dollar"></i></div></div><div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden"><div class="text-xs font-bold text-slate-400 uppercase tracking-wide">Std Absorption</div><div class="text-3xl font-bold text-blue-600 mt-2" id="kpiAbs">$0</div><div class="text-[10px] text-blue-400 mt-1">Overhead Recovery</div><div class="absolute right-4 top-6 text-blue-50 text-5xl opacity-50"><i class="fa-solid fa-industry"></i></div></div><div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden"><div class="text-xs font-bold text-slate-400 uppercase tracking-wide">Late Revenue Risk</div><div class="text-3xl font-bold text-red-600 mt-2" id="kpiLate">$0</div><div class="absolute right-4 top-6 text-red-50 text-5xl opacity-50"><i class="fa-solid fa-triangle-exclamation"></i></div></div></div><div class="grid grid-cols-1 lg:grid-cols-2 gap-6 h-96"><div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col"><h3 class="text-sm font-bold text-slate-600 mb-6">Machine Load Balance</h3><div class="flex-grow relative"><canvas id="chartLoad"></canvas></div></div><div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col"><h3 class="text-sm font-bold text-slate-600 mb-6">Financial Forecast (Sales vs Absorption)</h3><div class="flex-grow relative"><canvas id="chartRev"></canvas></div></div></div></div></div>
+    
     <div id="view-downtime" class="flex-1 hidden bg-white p-8 fade-in overflow-auto"><div class="max-w-4xl mx-auto"><h2 class="text-2xl font-bold text-slate-800 mb-6">Planned Downtime</h2><div class="bg-white p-6 rounded-xl border border-slate-200 mb-8 shadow-sm grid grid-cols-1 md:grid-cols-4 gap-4 items-end admin-only"><select id="dtMachine" class="w-full bg-slate-50 border border-slate-300 rounded p-2 text-sm"></select><input type="datetime-local" id="dtStart" class="w-full bg-slate-50 border border-slate-300 rounded p-2 text-sm"><input type="datetime-local" id="dtEnd" class="w-full bg-slate-50 border border-slate-300 rounded p-2 text-sm"><button onclick="addDowntime()" class="bg-red-600 text-white font-bold py-2 rounded text-sm shadow">Add Block</button></div><div class="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm"><table class="w-full text-sm text-left text-slate-600"><tbody id="dtBody" class="divide-y divide-slate-100"></tbody></table></div></div></div>
 </div>
 
@@ -270,52 +157,41 @@
         let machineState = {};
         
         // 1. DYNAMIC DOWNTIME GENERATION
-        let activeDowntime = [...downtime]; // Existing manual blocks
+        let activeDowntime = [...downtime]; 
 
         // Helper: Add downtime for a specific date/machine based on shift pattern
         function addShiftDowntime(mach, dateStr, pattern) {
             const date = new Date(dateStr);
             const midnight = date.setHours(0,0,0,0);
-            
-            // Shift 1: If false, block from start to start+dur
-            if (!pattern[0]) activeDowntime.push({ machine: mach, start: midnight + (shiftDefs[0].start * 3600000), end: midnight + (shiftDefs[0].start + shiftDefs[0].dur) * 3600000, reason: 'Staffing S1' });
-            // Shift 2
-            if (!pattern[1]) activeDowntime.push({ machine: mach, start: midnight + (shiftDefs[1].start * 3600000), end: midnight + (shiftDefs[1].start + shiftDefs[1].dur) * 3600000, reason: 'Staffing S2' });
-            // Shift 3
-            if (!pattern[2]) activeDowntime.push({ machine: mach, start: midnight + (shiftDefs[2].start * 3600000), end: midnight + (shiftDefs[2].start + shiftDefs[2].dur) * 3600000, reason: 'Staffing S3' });
+            if (!pattern[0]) activeDowntime.push({ machine: mach, start: midnight + (shiftDefs[0].start * 3600000), end: midnight + (shiftDefs[0].start + shiftDefs[0].dur) * 3600000, reason: 'Off S1' });
+            if (!pattern[1]) activeDowntime.push({ machine: mach, start: midnight + (shiftDefs[1].start * 3600000), end: midnight + (shiftDefs[1].start + shiftDefs[1].dur) * 3600000, reason: 'Off S2' });
+            if (!pattern[2]) activeDowntime.push({ machine: mach, start: midnight + (shiftDefs[2].start * 3600000), end: midnight + (shiftDefs[2].start + shiftDefs[2].dur) * 3600000, reason: 'Off S3' });
         }
 
-        // Iterate 90 days
+        // Generate 90 days of shift logic
         for(let d=0; d<90; d++) {
             const dayTs = now + (d * 86400000);
             const dateObj = new Date(dayTs);
             const dateStr = dateObj.toISOString().split('T')[0];
 
-            // A. GLOBAL HOLIDAY CHECK
             if (holidays.includes(dateStr)) {
                 MACHINES.forEach(m => activeDowntime.push({ machine: m, start: dayTs, end: dayTs + 86400000, reason: 'Holiday' }));
-                continue; // Skip specific machine logic
+                continue;
             }
 
-            // B. MACHINE SPECIFIC LOGIC
             MACHINES.forEach(mach => {
-                // Check for Monthly Exception Override
                 const exception = exceptions.find(ex => (ex.machine === mach || ex.machine === 'ALL') && dateStr >= ex.start && dateStr <= ex.end);
-                
                 if (exception) {
                     addShiftDowntime(mach, dateStr, exception.pattern);
                 } else {
-                    // Use Default Weekly Pattern
                     const defPattern = staffing[mach] || [true, true, true];
                     addShiftDowntime(mach, dateStr, defPattern);
                 }
             });
         }
-        
-        // Sort
         activeDowntime.sort((a,b) => a.start - b.start);
 
-        // 2. MATRIX CHANGEOVER
+        // 2. SETUP (MATRIX)
         const FIBER_MATRIX = { 'POLYESTER': {'ARAMID':8, 'PPS':4}, 'ARAMID': {'POLYESTER':12, 'PPS':6}, 'PPS': {'POLYESTER':8, 'ARAMID':8}, 'GENERIC': {'GENERIC':2} };
         function getChangeoverDuration(lastFiber, newFiber) {
             if (!lastFiber || !newFiber || lastFiber === newFiber) return 0;
@@ -326,22 +202,27 @@
 
         MACHINES.forEach(m => { machineState[m] = { time: now, lastFelt: null, lastFiber: null }; });
 
-        // 3. SCHEDULING (Standard Logic Preserved)
+        // 3. SORTING
         let queue = [...orders];
         if (config.campaign) { queue.sort((a,b) => { const fA = (a.fiber||'').toUpperCase(), fB = (b.fiber||'').toUpperCase(); if(fA<fB) return -1; if(fA>fB) return 1; return (a.rtsDate||0)-(b.rtsDate||0); }); } 
         else { queue.sort((a,b) => (a.rtsDate||0)-(b.rtsDate||0)); }
 
+        // 4. MAIN SCHEDULING
         queue.forEach(ord => {
             const r = rates[ord.felt] || Object.values(rates)[0] || {card:250, finish:700, qc:400};
             let statusUpper = (ord.status || '').toUpperCase();
+            
+            // Raw Material Constraint
             let materialReadyTime = now;
             if (statusUpper.includes('WAITING RAW') || statusUpper.includes('MATERIAL')) materialReadyTime = now + (7 * 86400000);
 
+            // Route
             let routeSteps = routes[ord.felt];
-            if (!routeSteps || routeSteps.length === 0) routeSteps = [{step:1, pool:MACHINES.filter(m=>m.includes('Card'))}, {step:2, pool:MACHINES.filter(m=>m.includes('Bruckner')||m.includes('Singer'))}, {step:3, pool:MACHINES.filter(m=>m.includes('QC'))}];
+            if (!routeSteps || routeSteps.length === 0) routeSteps = [{step:1, pool:MACHINES.filter(m=>m.includes('Card'))}, {step:2, pool:MACHINES.filter(m=>m.includes('Bruckner')||m.includes('Singer')||m.includes('Heatset'))}, {step:3, pool:MACHINES.filter(m=>m.includes('QC'))}];
             const lastStep = routeSteps[routeSteps.length - 1];
             if (!lastStep || !lastStep.pool.some(m => m.toUpperCase().includes('LAB'))) routeSteps = [...routeSteps, { step: 99, pool: ['QC Lab'] }];
 
+            // WIP Netting & START LOGIC
             let startStepIndex = 0;
             let currentReady = materialReadyTime;
             let wipQty = ord.wip || 0;
@@ -349,7 +230,10 @@
             let forcedFirstStep = null;
             if (remainingQty === 0 && ord.qty > 0) remainingQty = ord.qty;
 
-            if(statusUpper.includes('CARDING') && !statusUpper.includes('NOT')) { startStepIndex = 0; forcedFirstStep = { startAt: now, duration: (remainingQty / r.card) }; }
+            if(statusUpper.includes('CARDING') && !statusUpper.includes('NOT')) { 
+                startStepIndex = 0; forcedFirstStep = { startAt: now, duration: (remainingQty / r.card) }; 
+            }
+            // CRITICAL FIX: If status is ANY finishing machine, skip Carding
             else if(statusUpper.includes('WAITING BRUCKNER') || statusUpper.includes('WAITING HEATSET') || statusUpper.includes('WAITING SINGER') || statusUpper.includes('WAITING KUSTERS') || statusUpper.includes('WAITING PERKINS') || statusUpper.includes('WAITING DILO')) {
                 let targetKw = 'BRUCKNER';
                 if(statusUpper.includes('HEATSET')) targetKw = 'HEATSET';
@@ -358,7 +242,7 @@
                 if(statusUpper.includes('PERKINS')) targetKw = 'PERKINS';
                 if(statusUpper.includes('DILO')) targetKw = 'DILO';
                 startStepIndex = routeSteps.findIndex(s => s.pool.some(m => m.toUpperCase().includes(targetKw)));
-                if(startStepIndex === -1) startStepIndex = 1; 
+                if(startStepIndex === -1) startStepIndex = 1; // Default to first finishing step
             } else if(statusUpper.includes('WAITING QC')) {
                 startStepIndex = routeSteps.findIndex(s => s.pool.some(m => m.includes('QC')));
                 if (startStepIndex === -1) startStepIndex = routeSteps.length - 2; 
@@ -371,77 +255,139 @@
                 let stepRate = 500; 
                 const poolStr = pool.join(' ').toUpperCase();
                 if(poolStr.includes('CARD')) stepRate = r.card || 250; else if(poolStr.includes('QC')) stepRate = r.qc || 400; else stepRate = r.finish || 700;
+                
                 let stepQty = (i === startStepIndex && forcedFirstStep) ? remainingQty : ord.qty;
                 let stepDurHrs = stepQty / stepRate;
+                
                 if(i > startStepIndex) currentReady += 3600000;
+                
                 if(overrides[ord.id]) {
                      if(overrides[ord.id].card && poolStr.includes('CARD')) pool = [overrides[ord.id].card];
                      if(overrides[ord.id].fin && !poolStr.includes('CARD') && !poolStr.includes('QC')) pool = [overrides[ord.id].fin];
                      if(overrides[ord.id].qc && poolStr.includes('QC')) pool = [overrides[ord.id].qc];
                 }
+
                 let forceParams = (i === startStepIndex) ? forcedFirstStep : null;
                 const res = allocate(pool, currentReady, stepDurHrs, ord.felt, ord.fiber, forceParams);
                 allocations.push({ stepName: step.step, ...res });
                 currentReady = res.end;
             }
+            
             const finalEnd = allocations.length > 0 ? allocations[allocations.length-1].end : now;
             schedule.push({ ...ord, allocations: allocations, globalEnd: finalEnd, isLate: finalEnd > ord.rtsDate });
         });
 
+        // ----------------------------------------------------
+        //  THE HYBRID ALLOCATOR (Time Walker)
+        // ----------------------------------------------------
         function allocate(pool, readyTime, durHrs, felt, fiber, forceParams) {
             if(!pool || pool.length === 0) return { mach:'Err', start:readyTime, end:readyTime };
             const durMs = durHrs * 3600000;
-            const PATIENCE_THRESHOLD = 24 * 3600000;
+            const PATIENCE = 24 * 3600000;
+
             if (forceParams) {
-                const mName = pool[0]; const start = forceParams.startAt; const end = calculateFinishTime(mName, start, durMs);
-                if(!machineState[mName]) machineState[mName] = { time: now, lastFelt: null, lastFiber: null };
-                machineState[mName].time = end; machineState[mName].lastFelt = felt; machineState[mName].lastFiber = fiber;
+                // If forced, assume already running. Walk time forward from now.
+                const mName = pool[0]; 
+                const start = forceParams.startAt;
+                const end = walkTime(mName, start, durMs);
+                updateMachineState(mName, end, felt, fiber);
                 return { mach: mName, start: start, end: end };
             }
+
+            // EVALUATE OPTIONS
             let options = pool.map(mName => {
-                if (mName.toUpperCase().includes('LAB')) { const labRateMult = 10; const labDur = durMs / labRateMult; return { mach: mName, start: Math.max(readyTime, now), end: Math.max(readyTime, now) + labDur }; }
+                // QC LAB: Infinite Capacity
+                if (mName.toUpperCase().includes('LAB')) {
+                     const labDur = durMs / 10;
+                     return { mach: mName, start: Math.max(readyTime, now), end: Math.max(readyTime, now) + labDur };
+                }
+
                 const mState = machineState[mName] || { time: now, lastFelt: null, lastFiber: null };
+                
+                // 1. Determine Earliest Possible Start
+                // Start = Max(Machine Free Time, Previous Step Finish Time, Now)
                 let start = Math.max(mState.time, readyTime, now);
-                if(mState.lastFelt) { if (mState.lastFelt === felt) { start += 0; } else { start += getChangeoverDuration(mState.lastFiber, fiber); } }
-                start = findNextValidStart(mName, start);
-                const end = calculateFinishTime(mName, start, durMs);
+                
+                // 2. Add Changeover Penalty (Simply shifts start time)
+                if(mState.lastFelt && mState.lastFelt !== felt) {
+                    start += getChangeoverDuration(mState.lastFiber, fiber);
+                }
+
+                // 3. Ensure 'start' is in a valid shift (Jump if in downtime)
+                start = jumpToNextUptime(mName, start);
+
+                // 4. Calculate End by Walking Time (Burning duration only during uptime)
+                const end = walkTime(mName, start, durMs);
+
                 return { mach: mName, start: start, end: end };
             });
+
+            // PREFERENCE LOGIC
+            // Prefer pool[0]. If pool[0] finishes within PATIENCE of best option, take it.
             const preferredOption = options[0];
             const bestPossibleTime = Math.min(...options.map(o => o.end));
-            let selectedOption = null;
-            if (preferredOption.end <= (bestPossibleTime + PATIENCE_THRESHOLD)) selectedOption = preferredOption;
-            else selectedOption = options.reduce((prev, curr) => prev.end < curr.end ? prev : curr);
-            const mName = selectedOption.mach;
-            if(!machineState[mName]) machineState[mName] = { time: now, lastFelt: null, lastFiber: null };
-            if (!mName.toUpperCase().includes('LAB')) { machineState[mName].time = selectedOption.end; machineState[mName].lastFelt = felt; machineState[mName].lastFiber = fiber; }
-            return selectedOption;
+            let selected = (preferredOption.end <= bestPossibleTime + PATIENCE) ? preferredOption : options.reduce((p, c) => p.end < c.end ? p : c);
+
+            updateMachineState(selected.mach, selected.end, felt, fiber);
+            return selected;
         }
 
-        function findNextValidStart(machine, proposedStart) {
-            let t = proposedStart;
-            const machineDT = activeDowntime.filter(d => d.machine === machine);
-            while(true) {
+        function updateMachineState(mach, end, felt, fiber) {
+            if(!machineState[mach]) machineState[mach] = { time: now, lastFelt: null, lastFiber: null };
+            if (!mach.toUpperCase().includes('LAB')) {
+                 machineState[mach].time = end;
+                 machineState[mach].lastFelt = felt;
+                 machineState[mach].lastFiber = fiber;
+            }
+        }
+
+        // Jump 't' forward until it lands in a valid shift
+        function jumpToNextUptime(mach, t) {
+            const machineDT = activeDowntime.filter(d => d.machine === mach);
+            // Limit loops to prevent crashes in case of 100% downtime
+            let safety = 0;
+            while(safety < 100) {
                 const conflict = machineDT.find(dt => t >= dt.start && t < dt.end);
-                if(conflict) t = conflict.end; else break;
+                if(conflict) {
+                    t = conflict.end; 
+                } else {
+                    return t; // Valid time found
+                }
+                safety++;
             }
-            return t;
+            return t; 
         }
 
-        function calculateFinishTime(machine, startTime, durationMs) {
-            let remaining = durationMs;
-            let current = startTime;
-            const machineDT = activeDowntime.filter(d => d.machine === machine && d.end > startTime);
-            let loops = 0;
-            while(remaining > 0 && loops < 5000) {
-                const nextDT = machineDT.find(d => d.start > current); 
-                if (!nextDT) return current + remaining;
-                const timeToDT = nextDT.start - current;
-                if (timeToDT >= remaining) return current + remaining;
-                else { remaining -= timeToDT; current = nextDT.end; }
-                loops++;
+        // The "Time Walker" - burns duration only during uptime
+        function walkTime(mach, startTime, duration) {
+            let remaining = duration;
+            let cursor = startTime;
+            const machineDT = activeDowntime.filter(d => d.machine === mach && d.end > startTime);
+            let safety = 0;
+
+            while(remaining > 0 && safety < 10000) {
+                // Find next downtime that interrupts us
+                const nextDT = machineDT.find(d => d.start > cursor);
+                
+                if (!nextDT) {
+                    // No more downtime ever. Finish the job.
+                    return cursor + remaining;
+                }
+
+                // Time until that downtime hits
+                const timeToBlock = nextDT.start - cursor;
+
+                if (timeToBlock >= remaining) {
+                    // We can finish before the downtime starts
+                    return cursor + remaining;
+                } else {
+                    // We run until downtime, then pause
+                    remaining -= timeToBlock;
+                    cursor = nextDT.end; // Jump over the downtime block completely
+                }
+                safety++;
             }
-            return current + remaining;
+            return cursor + remaining;
         }
 
         let dayLoads = {};
