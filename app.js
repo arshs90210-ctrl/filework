@@ -1,5 +1,5 @@
 /**
- * Alkegen Scheduler v8.0 - System Controller
+ * Alkegen Scheduler v8.5 - System Controller
  */
 
 const SB_URL = 'https://tihzqfpyfanohnazvkcx.supabase.co';
@@ -185,7 +185,7 @@ async function handleOrderUpload(inp) {
             else if(ck.includes('RTS') || ck === 'REQDATE') o.rtsRaw = val;
             else if(ck.includes('STATUS') || ck.includes('PRODUCTION AREA')) o.status = val;
             else if(ck.includes('FIBER') && ck.includes('DESC')) o.fiber = val;
-            else if(ck.includes('SALESNAME') || ck === 'SPERSON') o.sales = val; // Capture Sales Person
+            else if(ck.includes('SALESNAME') || ck === 'SPERSON') o.sales = val; 
         }
         if(o.sales) SALES_PEOPLE.add(o.sales);
 
@@ -372,8 +372,10 @@ function renderAll() {
             
             let type = 'fin';
             const mUp = task.mach.toUpperCase();
+            // IMPROVED VISUAL LOGIC
             if(mUp.includes('CARD')) type = 'card';
             else if(mUp.includes('QC')) type = 'qc';
+            // Anything else (Bruckner, Singer, Heatset, Dilo) defaults to 'fin' (Purple)
 
             const b = document.createElement('div');
             b.className = `bar bar-${type} ${isForced?'bar-forced':''}`;
