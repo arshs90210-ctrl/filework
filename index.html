@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Alkegen Scheduler v8.0 (Integrated Logic)</title>
+  <title>Alkegen Scheduler v8.5 (Logic Corrected)</title>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.tailwindcss.com"></script>
@@ -20,7 +20,7 @@
             <i class="fa-solid fa-industry text-white text-2xl"></i>
         </div>
         <h1 class="text-2xl font-bold text-slate-800">Alkegen Scheduler</h1>
-        <p class="text-slate-500 text-sm">Secure Production System v8.0</p>
+        <p class="text-slate-500 text-sm">Secure Production System v8.5</p>
     </div>
     <div class="login-box">
         <div class="space-y-4">
@@ -297,10 +297,9 @@
         let now = simStart || new Date().getTime();
         let machineState = {};
         
-        // 1. DOWNTIME FLATTENING (Sorting and Merging)
+        // 1. DOWNTIME FLATTENING
         let activeDowntime = [...downtime].sort((a,b) => a.start - b.start);
 
-        // Generate Staffing Downtime
         for(let d=0; d<90; d++) {
             const dayStart = now + (d * 86400000);
             const midnight = new Date(dayStart).setHours(0,0,0,0);
@@ -368,14 +367,14 @@
                  ];
             }
             
-            // CRITICAL LOGIC: Ensure QC Lab is ALWAYS the final step
+            // CRITICAL: Ensure QC Lab is ALWAYS final
             const lastStep = routeSteps[routeSteps.length - 1];
             const hasQCLab = lastStep && lastStep.pool.some(m => m.toUpperCase().includes('LAB'));
             if (!hasQCLab) {
                 routeSteps = [...routeSteps, { step: 99, pool: ['QC Lab'] }];
             }
 
-            // WIP Netting
+            // WIP Netting (CORRECTED LOGIC FOR HEATSET/SINGER)
             let startStepIndex = 0;
             let currentReady = materialReadyTime;
             let wipQty = ord.wip || 0;
@@ -387,11 +386,20 @@
             if(statusUpper.includes('CARDING') && !statusUpper.includes('NOT')) {
                 startStepIndex = 0; 
                 forcedFirstStep = { startAt: now, duration: (remainingQty / r.card) };
-            } else if(statusUpper.includes('WAITING BRUCKNER')) {
-                startStepIndex = 1;
+            } else if(statusUpper.includes('WAITING BRUCKNER') || statusUpper.includes('WAITING HEATSET') || statusUpper.includes('WAITING SINGER') || statusUpper.includes('WAITING KUSTERS') || statusUpper.includes('WAITING PERKINS')) {
+                // These are all FINISHING steps. Find where Finishing starts in the route (usually index 1)
+                // We attempt to find the step that contains the specific machine mentioned in status
+                let targetKw = 'BRUCKNER';
+                if(statusUpper.includes('HEATSET')) targetKw = 'HEATSET';
+                if(statusUpper.includes('SINGER')) targetKw = 'SINGER';
+                if(statusUpper.includes('KUSTERS')) targetKw = 'KUSTERS';
+                if(statusUpper.includes('PERKINS')) targetKw = 'PERKINS';
+
+                startStepIndex = routeSteps.findIndex(s => s.pool.some(m => m.toUpperCase().includes(targetKw)));
+                if(startStepIndex === -1) startStepIndex = 1; // Default to second step if specific machine not found in route
             } else if(statusUpper.includes('WAITING QC')) {
                 startStepIndex = routeSteps.findIndex(s => s.pool.some(m => m.includes('QC')));
-                if (startStepIndex === -1) startStepIndex = routeSteps.length - 2; // Fallback
+                if (startStepIndex === -1) startStepIndex = routeSteps.length - 2; 
             }
 
             let allocations = [];
@@ -408,9 +416,9 @@
                 let stepQty = (i === startStepIndex && forcedFirstStep) ? remainingQty : ord.qty;
                 let stepDurHrs = stepQty / stepRate;
 
-                // Move times (Transfer delay)
+                // Move times
                 if(i > startStepIndex) {
-                    currentReady += 3600000; // 1 hr transfer
+                    currentReady += 3600000;
                 }
 
                 if(overrides[ord.id]) {
@@ -421,13 +429,10 @@
 
                 let forceParams = (i === startStepIndex) ? forcedFirstStep : null;
                 
-                // DEPENDENCY CHAIN: 'currentReady' implies the previous step is DONE.
                 const res = allocate(pool, currentReady, stepDurHrs, ord.felt, ord.fiber, forceParams);
                 
                 allocations.push({ stepName: step.step, ...res });
-                
-                // The NEXT step cannot start until THIS step finishes
-                currentReady = res.end; 
+                currentReady = res.end;
             }
 
             const finalEnd = allocations.length > 0 ? allocations[allocations.length-1].end : now;
@@ -440,7 +445,7 @@
         });
 
         // ----------------------------------------------------
-        //  ROBUST ALLOCATOR
+        //  ROBUST ALLOCATOR (Downtime Skipping Fix)
         // ----------------------------------------------------
         function allocate(pool, readyTime, durHrs, felt, fiber, forceParams) {
             if(!pool || pool.length === 0) return { mach:'Err', start:readyTime, end:readyTime };
@@ -460,9 +465,7 @@
                 return { mach: mName, start: start, end: end };
             }
 
-            // Calculate options
             let options = pool.map(mName => {
-                // QC LAB: Infinite capacity, instant throughput (simulated)
                 if (mName.toUpperCase().includes('LAB')) {
                      const labRateMult = 10; 
                      const labDur = durMs / labRateMult;
@@ -471,7 +474,7 @@
 
                 const mState = machineState[mName] || { time: now, lastFelt: null, lastFiber: null };
                 
-                // 1. Earliest Start (Machine Free OR Previous Step Done)
+                // 1. Earliest Start
                 let start = Math.max(mState.time, readyTime, now);
                 
                 // 2. Changeover
@@ -480,16 +483,16 @@
                     else { start += getChangeoverDuration(mState.lastFiber, fiber); }
                 }
 
-                // 3. Jump over Downtime (Start Logic)
+                // 3. Jump over Downtime
                 start = findNextValidStart(mName, start);
 
-                // 4. Calculate End (Duration Logic)
+                // 4. Calculate End
                 const end = calculateFinishTime(mName, start, durMs);
 
                 return { mach: mName, start: start, end: end };
             });
 
-            // Preference: Try first machine. If wait is < 24h, take it.
+            // Preference Logic
             const preferredOption = options[0];
             const bestPossibleTime = Math.min(...options.map(o => o.end));
             
@@ -512,23 +515,19 @@
             return selectedOption;
         }
 
-        // Helper: Find valid start time (skipping downtime blocks)
+        // Helper: Find valid start time (skipping adjacent downtime blocks)
         function findNextValidStart(machine, proposedStart) {
             let t = proposedStart;
-            // Get sorted downtime for this machine
             const machineDT = activeDowntime.filter(d => d.machine === machine);
             
-            let inConflict = true;
-            while(inConflict) {
-                inConflict = false;
-                for(let dt of machineDT) {
-                    // Check if 't' falls inside a block
-                    if(t >= dt.start && t < dt.end) {
-                        t = dt.end; // Jump to end
-                        inConflict = true; 
-                        // Break to re-scan from the new 't' (handling adjacent blocks)
-                        break; 
-                    }
+            // Loop until t is NOT inside any block
+            while(true) {
+                const conflict = machineDT.find(dt => t >= dt.start && t < dt.end);
+                if(conflict) {
+                    t = conflict.end; // Jump to end of this block
+                    // Continue loop immediately to check if we landed in ANOTHER block (e.g. Shift 1 end -> Shift 2 start)
+                } else {
+                    break; // No conflict found, t is valid
                 }
             }
             return t;
@@ -541,7 +540,7 @@
             const machineDT = activeDowntime.filter(d => d.machine === machine && d.end > startTime);
 
             let loops = 0;
-            while(remaining > 0 && loops < 2000) {
+            while(remaining > 0 && loops < 5000) {
                 // Find next downtime that starts AFTER current
                 const nextDT = machineDT.find(d => d.start > current); 
                 
