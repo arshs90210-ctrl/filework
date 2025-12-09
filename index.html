@@ -3,14 +3,13 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Alkegen Scheduler v6.0</title>
+  <title>Alkegen Scheduler v7.0 (Robust)</title>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
-
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -21,7 +20,7 @@
             <i class="fa-solid fa-industry text-white text-2xl"></i>
         </div>
         <h1 class="text-2xl font-bold text-slate-800">Alkegen Scheduler</h1>
-        <p class="text-slate-500 text-sm">Secure Production System v6.0</p>
+        <p class="text-slate-500 text-sm">Secure Production System v7.0</p>
     </div>
     <div class="login-box">
         <div class="space-y-4">
@@ -64,11 +63,9 @@
 
         <div class="flex items-center gap-3">
             <span id="userEmailDisplay" class="text-xs text-slate-400 mr-2 font-mono"></span>
-            
             <button onclick="showModal('uploadModal')" class="admin-only px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-lg shadow-sm transition flex items-center gap-2">
                 <i class="fa-solid fa-cloud-arrow-up"></i> Import Data
             </button>
-            
             <button onclick="handleLogout()" class="w-9 h-9 flex items-center justify-center text-slate-400 hover:bg-slate-100 rounded-lg border border-slate-200 transition" title="Logout">
                 <i class="fa-solid fa-right-from-bracket"></i>
             </button>
@@ -81,6 +78,14 @@
                 <div class="flex flex-col">
                     <label class="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Start Date</label>
                     <input type="date" id="simDate" class="text-xs border-none bg-transparent font-bold text-slate-700 p-0 focus:ring-0 cursor-pointer hover:text-blue-600 transition" onchange="runEngine()">
+                </div>
+                <div class="h-8 w-px bg-slate-200"></div>
+                <div class="flex items-center gap-3 group relative">
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="campaignMode" class="sr-only peer" checked onchange="runEngine()">
+                        <div class="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                        <span class="ml-2 text-xs font-bold text-slate-600 group-hover:text-slate-900 transition">Campaign Mode</span>
+                    </label>
                 </div>
                 <div class="h-8 w-px bg-slate-200"></div>
                 <div class="text-xs font-mono">
@@ -136,7 +141,7 @@
             <div class="flex justify-between items-end mb-6">
                 <div>
                     <h2 class="text-2xl font-bold text-slate-800">Dynamic Routing Graph</h2>
-                    <p class="text-sm text-slate-500">Based on Digital Schedule Sheet4. Routes are parsed automatically.</p>
+                    <p class="text-sm text-slate-500">Priority: First machine listed is preferred. Engine will try first option before falling back.</p>
                 </div>
             </div>
             <div class="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
@@ -184,7 +189,13 @@
             <div class="flex justify-between items-end mb-6">
                 <h2 class="text-2xl font-bold text-slate-800">Rates & Changeovers</h2>
                 <div class="flex gap-3 admin-only">
+                     <div class="bg-slate-50 p-2 rounded-lg border border-slate-200 flex items-center gap-3">
+                        <span class="text-xs font-bold text-slate-500 uppercase ml-2">Setup Penalty</span>
+                        <input type="number" id="setupPenalty" value="4" class="w-16 bg-white border border-slate-300 text-slate-700 rounded px-2 py-1 text-center font-mono text-sm" onchange="runEngine()">
+                        <span class="text-xs text-slate-500 mr-2">hours</span>
+                    </div>
                     <button onclick="document.getElementById('massRateModal').style.display='flex'" class="px-4 py-2 bg-slate-100 border border-slate-300 text-slate-700 font-bold rounded hover:bg-white transition">Mass Update</button>
+                    <button onclick="addNewRateRow()" class="px-4 py-2 bg-blue-600 text-white font-bold rounded shadow hover:bg-blue-700">+ Add Rate</button>
                 </div>
             </div>
             <div class="bg-white rounded-lg border border-slate-200 overflow-hidden shadow-sm">
@@ -246,19 +257,16 @@
         <h2 class="text-xl font-bold mb-6 text-slate-800 border-b border-slate-200 pb-2">Import Data</h2>
         <div class="space-y-4">
             <div class="border border-dashed border-slate-300 rounded-lg p-6 hover:bg-slate-50 transition cursor-pointer relative text-center group">
-                <i class="fa-solid fa-microchip text-2xl text-blue-500 mb-2"></i>
                 <div class="font-bold text-slate-700">1. Load Rates</div>
                 <div class="text-xs text-slate-500" id="rateStatus">Rates.xlsx</div>
                 <input type="file" class="absolute inset-0 opacity-0 cursor-pointer" onchange="handleRateUpload(this)">
             </div>
             <div class="border border-dashed border-slate-300 rounded-lg p-6 hover:bg-slate-50 transition cursor-pointer relative text-center group">
-                <i class="fa-solid fa-file-csv text-2xl text-green-500 mb-2"></i>
                 <div class="font-bold text-slate-700">2. Load Orders</div>
                 <div class="text-xs text-slate-500" id="orderStatus">Open Orders.xlsx</div>
                 <input type="file" class="absolute inset-0 opacity-0 cursor-pointer" onchange="handleOrderUpload(this)">
             </div>
             <div class="border border-dashed border-slate-300 rounded-lg p-6 hover:bg-slate-50 transition cursor-pointer relative text-center group">
-                <i class="fa-solid fa-route text-2xl text-purple-500 mb-2"></i>
                 <div class="font-bold text-slate-700">3. Load Digital Schedule</div>
                 <div class="text-xs text-slate-500" id="routeStatus">Digital Schedule.xlsx</div>
                 <input type="file" class="absolute inset-0 opacity-0 cursor-pointer" onchange="handleRouteUpload(this)">
@@ -276,6 +284,7 @@
         <h2 class="text-lg font-bold text-slate-800 mb-4">Edit Routing: <span id="editRouteFelt" class="text-blue-600"></span></h2>
         <div class="mb-4">
             <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Define Flow</label>
+            <p class="text-xs text-slate-400 mb-2">Comma separated steps. Use "/" for options. First option is preferred.<br>Ex: <code>Card 1/Card 2, Bruckner 1, QC 1</code></p>
             <textarea id="editRouteString" class="w-full bg-slate-50 border border-slate-300 rounded p-3 text-sm font-mono h-32"></textarea>
         </div>
         <div class="flex justify-end gap-3">
@@ -361,7 +370,7 @@
         let machineState = {};
         let activeDowntime = [...downtime];
 
-        // 0. MATRIX CHANGEOVER LOGIC
+        // 0. MATRIX CHANGEOVER LOGIC (v6.0 Improvement)
         const FIBER_MATRIX = {
             'POLYESTER': { 'ARAMID': 8, 'PPS': 4 },
             'ARAMID': { 'POLYESTER': 12, 'PPS': 6 },
@@ -373,7 +382,6 @@
             if (!lastFiber || !newFiber || lastFiber === newFiber) return 0;
             const lf = lastFiber.toUpperCase().split(' ')[0];
             const nf = newFiber.toUpperCase().split(' ')[0];
-            
             if (FIBER_MATRIX[lf] && FIBER_MATRIX[lf][nf]) return FIBER_MATRIX[lf][nf] * 3600000;
             return 4 * 3600000;
         }
@@ -393,7 +401,7 @@
 
         MACHINES.forEach(m => { machineState[m] = { time: now, lastFelt: null, lastFiber: null }; });
 
-        // 2. SORTING (Campaign)
+        // 2. SORTING
         let queue = [...orders];
         if (config.campaign) {
             queue.sort((a,b) => {
@@ -412,11 +420,13 @@
             const r = rates[ord.felt] || Object.values(rates)[0] || {card:250, finish:700, qc:400};
             let statusUpper = (ord.status || '').toUpperCase();
             
+            // Raw Material Constraint (v6.0)
             let materialReadyTime = now;
             if (statusUpper.includes('WAITING RAW') || statusUpper.includes('MATERIAL')) {
                 materialReadyTime = now + (7 * 86400000);
             }
 
+            // Routing
             let routeSteps = routes[ord.felt];
             if (!routeSteps || routeSteps.length === 0) {
                  routeSteps = [
@@ -426,6 +436,7 @@
                  ];
             }
 
+            // WIP Netting (v6.0)
             let startStepIndex = 0;
             let currentReady = materialReadyTime;
             let wipQty = ord.wip || 0;
@@ -447,10 +458,11 @@
 
             for(let i = startStepIndex; i < routeSteps.length; i++) {
                 const step = routeSteps[i];
-                let pool = step.pool;
+                let pool = step.pool; // This pool is ORDERED by preference (index 0 is best)
+                
+                // Rate Lookup
                 let stepRate = 500; 
                 const poolStr = pool.join(' ').toUpperCase();
-                
                 if(poolStr.includes('CARD')) stepRate = r.card || 250;
                 else if(poolStr.includes('QC')) stepRate = r.qc || 400;
                 else stepRate = r.finish || 700;
@@ -458,9 +470,17 @@
                 let stepQty = (i === startStepIndex && forcedFirstStep) ? remainingQty : ord.qty;
                 let stepDurHrs = stepQty / stepRate;
 
+                // Move times
                 if(i > startStepIndex) {
                     if(poolStr.includes('QC')) currentReady += 1800000;
                     else currentReady += 3600000;
+                }
+
+                // Force Override from UI
+                if(overrides[ord.id]) {
+                     if(overrides[ord.id].card && poolStr.includes('CARD')) pool = [overrides[ord.id].card];
+                     if(overrides[ord.id].fin && !poolStr.includes('CARD') && !poolStr.includes('QC')) pool = [overrides[ord.id].fin];
+                     if(overrides[ord.id].qc && poolStr.includes('QC')) pool = [overrides[ord.id].qc];
                 }
 
                 let forceParams = (i === startStepIndex) ? forcedFirstStep : null;
@@ -478,9 +498,11 @@
             });
         });
 
+        // Allocation with PREFERENCE Logic
         function allocate(pool, readyTime, durHrs, felt, fiber, forceParams) {
             if(!pool || pool.length === 0) return { mach:'Err', start:readyTime, end:readyTime };
             const durMs = durHrs * 3600000;
+            // PATIENCE: How long to wait for preferred machine (Index 0)
             const PATIENCE_THRESHOLD = 24 * 3600000; 
 
             if (forceParams) {
@@ -495,13 +517,24 @@
             }
 
             let options = pool.map(mName => {
+                // QC LAB LOGIC: Super fast, infinite capacity (no downtime check)
+                if (mName.toUpperCase().includes('LAB')) {
+                     const labRateMult = 10; // 10x speed or capacity
+                     const labDur = durMs / labRateMult;
+                     // Lab is always available now or at readyTime
+                     return { mach: mName, start: Math.max(readyTime, now), end: Math.max(readyTime, now) + labDur };
+                }
+
                 const mState = machineState[mName] || { time: now, lastFelt: null, lastFiber: null };
                 let start = Math.max(mState.time, readyTime, now);
+                
+                // Matrix Changeover
                 if(mState.lastFelt) {
                     if (mState.lastFelt === felt) { start += 0; } 
                     else { start += getChangeoverDuration(mState.lastFiber, fiber); }
                 }
 
+                // Downtime Check
                 let conflict = true;
                 let attempts = 0;
                 while(conflict && attempts < 50) {
@@ -514,19 +547,31 @@
                 return { mach: mName, start: start, end: start + durMs };
             });
 
+            // PREFERENCE LOGIC:
+            // pool[0] is the Preferred Machine. options[0] corresponds to it.
+            // If options[0] is available reasonably soon, take it.
+            const preferredOption = options[0];
             const bestPossibleTime = Math.min(...options.map(o => o.end));
+            
             let selectedOption = null;
-            for (let i = 0; i < options.length; i++) {
-                const opt = options[i];
-                if (opt.end <= (bestPossibleTime + PATIENCE_THRESHOLD)) { selectedOption = opt; break; }
+
+            // If preferred machine finishes within 24hrs of the "absolute best possible time", take it.
+            if (preferredOption.end <= (bestPossibleTime + PATIENCE_THRESHOLD)) {
+                selectedOption = preferredOption;
+            } else {
+                // Otherwise, find the fastest one
+                selectedOption = options.reduce((prev, curr) => prev.end < curr.end ? prev : curr);
             }
-            if (!selectedOption) selectedOption = options.reduce((prev, curr) => prev.end < curr.end ? prev : curr);
 
             const mName = selectedOption.mach;
             if(!machineState[mName]) machineState[mName] = { time: now, lastFelt: null, lastFiber: null };
-            machineState[mName].time = selectedOption.end;
-            machineState[mName].lastFelt = felt;
-            machineState[mName].lastFiber = fiber;
+            // Update machine state only if it's not the Lab (simulating infinite capacity)
+            if (!mName.toUpperCase().includes('LAB')) {
+                 machineState[mName].time = selectedOption.end;
+                 machineState[mName].lastFelt = felt;
+                 machineState[mName].lastFiber = fiber;
+            }
+            
             return selectedOption;
         }
 
