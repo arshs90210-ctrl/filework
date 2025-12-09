@@ -386,17 +386,22 @@
             if(statusUpper.includes('CARDING') && !statusUpper.includes('NOT')) {
                 startStepIndex = 0; 
                 forcedFirstStep = { startAt: now, duration: (remainingQty / r.card) };
-            } else if(statusUpper.includes('WAITING BRUCKNER') || statusUpper.includes('WAITING HEATSET') || statusUpper.includes('WAITING SINGER') || statusUpper.includes('WAITING KUSTERS') || statusUpper.includes('WAITING PERKINS')) {
-                // These are all FINISHING steps. Find where Finishing starts in the route (usually index 1)
-                // We attempt to find the step that contains the specific machine mentioned in status
+            } else if(statusUpper.includes('WAITING BRUCKNER') || statusUpper.includes('WAITING HEATSET') || statusUpper.includes('WAITING SINGER') || statusUpper.includes('WAITING KUSTERS') || statusUpper.includes('WAITING PERKINS') || statusUpper.includes('WAITING DILO') || statusUpper.includes('WAITING HUNTER') || statusUpper.includes('WAITING FEHRER')) {
+                // FIXED: These are all FINISHING statuses. Do NOT restart Carding.
+                
+                // Attempt to find the specific machine step in the route
                 let targetKw = 'BRUCKNER';
                 if(statusUpper.includes('HEATSET')) targetKw = 'HEATSET';
                 if(statusUpper.includes('SINGER')) targetKw = 'SINGER';
                 if(statusUpper.includes('KUSTERS')) targetKw = 'KUSTERS';
                 if(statusUpper.includes('PERKINS')) targetKw = 'PERKINS';
+                if(statusUpper.includes('DILO')) targetKw = 'DILO';
 
                 startStepIndex = routeSteps.findIndex(s => s.pool.some(m => m.toUpperCase().includes(targetKw)));
-                if(startStepIndex === -1) startStepIndex = 1; // Default to second step if specific machine not found in route
+                if(startStepIndex === -1) {
+                    // Fallback: If specific machine not in route, assume generic Finishing step (usually index 1)
+                    startStepIndex = 1; 
+                }
             } else if(statusUpper.includes('WAITING QC')) {
                 startStepIndex = routeSteps.findIndex(s => s.pool.some(m => m.includes('QC')));
                 if (startStepIndex === -1) startStepIndex = routeSteps.length - 2; 
