@@ -1,6 +1,5 @@
 /**
- * Alkegen Scheduler v6.0 - System Logic
- * Handles UI, Data Ingestion, and Worker Communication
+ * Alkegen Scheduler v7.0 - Robust UI & Logic
  */
 
 const SB_URL = 'https://tihzqfpyfanohnazvkcx.supabase.co';
@@ -74,7 +73,7 @@ async function initApp(user) {
     initUI();
     renderStaffingTable();
     await loadFromDB();
-    loadLocalState(); // Restore session if available
+    loadLocalState(); 
 
     const mainScroll = document.getElementById('mainScroll');
     const headerScroll = document.getElementById('timelineHeaderWrapper');
@@ -105,7 +104,6 @@ async function loadFromDB() {
 }
 
 function saveLocalState() {
-    // Save critical transient data to LocalStorage
     localStorage.setItem('alkegen_orders', JSON.stringify(RAW_ORDERS));
     localStorage.setItem('alkegen_routes', JSON.stringify(ROUTES));
     localStorage.setItem('alkegen_overrides', JSON.stringify(OVERRIDES));
@@ -140,7 +138,7 @@ function initWorker() {
         document.getElementById('engineStatus').innerText = "ONLINE";
         document.getElementById('engineStatus').className = "text-green-600 font-bold";
         document.getElementById('uploadModal').style.display = 'none';
-        saveLocalState(); // Auto-save on successful run
+        saveLocalState();
     };
 }
 
@@ -155,7 +153,6 @@ function readFile(file) {
 async function handleOrderUpload(inp) {
     const wb = await readFile(inp.files[0]);
     let rows = [];
-    // Prioritize "Detail" or "Data" sheets which usually contain WIP info
     for(const sn of wb.SheetNames) {
         const lower = sn.toLowerCase();
         if(lower.includes('detail') || lower.includes('data') || lower.includes('sheet2')) {
@@ -163,31 +160,25 @@ async function handleOrderUpload(inp) {
              break;
         }
     }
-    // Fallback if no specific sheet found
     if(!rows.length) rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
 
     RAW_ORDERS = rows.map((r, i) => {
         let o = { id:`UNK-${i}`, felt:'Unknown', qty:0, wip:0, val:0, status:'', fiber:'Generic' };
-        
-        // Dynamic Column Mapping
         for(let k in r) {
             const ck = k.toUpperCase().trim();
             const val = r[k];
-            
             if(ck.includes('ORDER') && ck.includes('ID')) o.id = val;
             else if(ck === 'FELTCODE' || ck === 'FELT CODE') o.felt = val;
             else if(ck === 'BALANCE' || ck === 'BAL YDS' || ck === 'YARDSORD') o.qty = parseFloat(val)||0;
-            else if(ck === 'YARDSWIP' || ck === 'WIP') o.wip = parseFloat(val)||0; // NEW: Capture WIP
+            else if(ck === 'YARDSWIP' || ck === 'WIP') o.wip = parseFloat(val)||0;
             else if(ck.includes('SALES') || ck.includes('VAL')) o.val = parseFloat(val)||0;
             else if(ck.includes('RTS') || ck === 'REQDATE') o.rtsRaw = val;
             else if(ck.includes('STATUS') || ck.includes('PRODUCTION AREA')) o.status = val;
             else if(ck.includes('FIBER') && ck.includes('DESC')) o.fiber = val;
         }
-
         if(typeof o.rtsRaw === 'number') o.rtsDate = new Date(Math.round((o.rtsRaw - 25569)*86400*1000)).getTime();
         else if(o.rtsRaw) o.rtsDate = new Date(o.rtsRaw).getTime();
         else o.rtsDate = new Date('2099-12-31').getTime();
-        
         return o;
     }).filter(o => o.qty > 0);
 
@@ -252,14 +243,13 @@ async function handleRouteUpload(inp) {
     saveLocalState();
 }
 
-// --- UI RENDERING (OPTIMIZED) ---
+// --- UI RENDERING ---
 
 function renderAll() {
     const tbody = document.getElementById('taskTableBody');
     const timelineHeader = document.getElementById('timelineHeader');
     const timelineBody = document.getElementById('timelineBody');
     
-    // Clear existing
     tbody.innerHTML = '';
     timelineHeader.innerHTML = '';
     timelineBody.innerHTML = '';
@@ -274,7 +264,6 @@ function renderAll() {
     timelineHeader.style.width = `${width}px`;
     const startDayIdx = Math.floor(now / 86400000);
     
-    // Header Fragment
     const headerFrag = document.createDocumentFragment();
     for(let i=0; i<totalDays; i++) {
         const t = now + (i * 86400000);
@@ -295,14 +284,12 @@ function renderAll() {
     }
     timelineHeader.appendChild(headerFrag);
 
-    // Body Fragments (PERFORMANCE FIX)
     const tableFrag = document.createDocumentFragment();
     const chartFrag = document.createDocumentFragment();
 
     SCHEDULE.forEach(row => {
         const isForced = OVERRIDES[row.id];
         
-        // Table Row
         const tr = document.createElement('tr');
         if(row.isLate) tr.classList.add('late-row');
         tr.innerHTML = `
@@ -315,7 +302,6 @@ function renderAll() {
         `;
         tableFrag.appendChild(tr);
 
-        // Chart Row
         const trDiv = document.createElement('div');
         trDiv.className = 'chart-row';
         trDiv.style.width = `${width}px`;
@@ -355,7 +341,171 @@ function renderAll() {
     timelineBody.appendChild(chartFrag);
 }
 
-// ... [Existing Table/Form helpers: renderRatesTable, openRateEdit, etc. kept as is but excluded for brevity, logic remains same] ...
+// --- SEQUENCING TAB ---
+function renderSequencingTable() {
+    const tb = document.getElementById('sequencingTableBody');
+    tb.innerHTML = Object.keys(ROUTES).sort().map(f => {
+        const steps = ROUTES[f];
+        const routeStr = steps.map(s => `[${s.pool.join('/')}]`).join(' <i class="fa-solid fa-arrow-right text-xs mx-1 text-slate-300"></i> ');
+        return `
+        <tr class="hover:bg-slate-50 border-b border-slate-100">
+            <td class="p-4 font-bold text-blue-600">${f}</td>
+            <td class="p-4 text-xs font-mono">${routeStr}</td>
+            <td class="p-4 text-center">
+                <button onclick="openRouteEdit('${f}')" class="text-blue-500 hover:underline text-xs admin-only"><i class="fa-solid fa-pen"></i></button>
+            </td>
+        </tr>`;
+    }).join('');
+}
+
+function openRouteEdit(felt) {
+    if(USER_ROLE !== 'admin') return alert('Admin only');
+    const steps = ROUTES[felt] || [];
+    const str = steps.map(s => s.pool.join('/')).join(', ');
+    document.getElementById('editRouteFelt').innerText = felt;
+    document.getElementById('editRouteString').value = str;
+    document.getElementById('editRouteModal').style.display = 'flex';
+}
+
+function saveRouteEdit() {
+    const felt = document.getElementById('editRouteFelt').innerText;
+    const raw = document.getElementById('editRouteString').value;
+    const parts = raw.split(',');
+    
+    const newSteps = parts.map((p, i) => {
+        const machines = p.split('/').map(m => m.trim());
+        return { step: i+1, pool: machines };
+    });
+
+    ROUTES[felt] = newSteps;
+    document.getElementById('editRouteModal').style.display = 'none';
+    renderSequencingTable();
+    saveLocalState();
+    runEngine();
+}
+
+// --- RATES TAB ---
+function renderRatesTable() {
+    const tb = document.getElementById('ratesTableBody');
+    tb.innerHTML = Object.keys(RATES).sort().map(k => `
+        <tr class="hover:bg-slate-50 transition">
+            <td class="p-4 font-mono text-blue-600 font-bold">${k}</td>
+            <td class="p-4 text-right">${RATES[k].card}</td>
+            <td class="p-4 text-right">${RATES[k].finish}</td>
+            <td class="p-4 text-right">${RATES[k].qc}</td>
+            <td class="p-4 text-center">
+                <button class="text-blue-500 hover:text-blue-700 mr-2 admin-only" onclick="openRateEdit('${k}')"><i class="fa-solid fa-pen"></i></button>
+                <button class="text-red-400 hover:text-red-600 admin-only" onclick="deleteRate('${k}')"><i class="fa-solid fa-trash"></i></button>
+            </td>
+        </tr>`).join('');
+}
+
+function openRateEdit(felt) {
+    if(USER_ROLE !== 'admin') return alert('Admin only');
+    const r = RATES[felt];
+    document.getElementById('editRateFelt').innerText = felt;
+    document.getElementById('editRateCard').value = r.card;
+    document.getElementById('editRateFin').value = r.finish;
+    document.getElementById('editRateQC').value = r.qc;
+    document.getElementById('editRateModal').style.display = 'flex';
+}
+
+function saveRateEdit() {
+    const felt = document.getElementById('editRateFelt').innerText;
+    const c = parseFloat(document.getElementById('editRateCard').value);
+    const f = parseFloat(document.getElementById('editRateFin').value);
+    const q = parseFloat(document.getElementById('editRateQC').value);
+    
+    RATES[felt] = { card:c, finish:f, qc:q };
+    document.getElementById('editRateModal').style.display = 'none';
+    renderRatesTable();
+    runEngine();
+}
+
+function applyMassRate() {
+    if(USER_ROLE !== 'admin') return alert('Admin only');
+    const filter = document.getElementById('massRateFilter').value.toUpperCase();
+    const c = parseFloat(document.getElementById('massRateCard').value);
+    const f = parseFloat(document.getElementById('massRateFin').value);
+    const q = parseFloat(document.getElementById('massRateQC').value);
+    
+    Object.keys(RATES).forEach(k => {
+        if(k.toUpperCase().includes(filter)) {
+            if(c) RATES[k].card = c;
+            if(f) RATES[k].finish = f;
+            if(q) RATES[k].qc = q;
+        }
+    });
+    document.getElementById('massRateModal').style.display='none';
+    renderRatesTable();
+    runEngine();
+}
+
+function addNewRateRow() {
+    if(USER_ROLE !== 'admin') return alert('Admin only');
+    const f = prompt("Enter Felt Code:");
+    if(f) {
+        RATES[f] = { card:250, finish:700, qc:400 };
+        renderRatesTable();
+    }
+}
+
+// --- STAFFING TAB ---
+function renderStaffingTable() {
+    const tb = document.getElementById('staffingTableBody');
+    tb.innerHTML = '';
+    CONFIG.machines.forEach(m => {
+        const s = STAFFING[m];
+        tb.innerHTML += `
+            <tr class="border-b border-slate-100 hover:bg-slate-50">
+                <td class="p-4 font-bold text-slate-700">${m}</td>
+                <td class="p-4 text-center"><input type="checkbox" ${s[0]?'checked':''} onchange="updateStaffing('${m}', 0, this.checked)" class="w-5 h-5 text-blue-600 rounded"></td>
+                <td class="p-4 text-center"><input type="checkbox" ${s[1]?'checked':''} onchange="updateStaffing('${m}', 1, this.checked)" class="w-5 h-5 text-blue-600 rounded"></td>
+                <td class="p-4 text-center"><input type="checkbox" ${s[2]?'checked':''} onchange="updateStaffing('${m}', 2, this.checked)" class="w-5 h-5 text-blue-600 rounded"></td>
+            </tr>
+        `;
+    });
+}
+function updateStaffing(m, i, v) { STAFFING[m][i] = v; }
+
+// --- EDIT ORDER MODAL ---
+function openEditModal(oid) {
+    const o = RAW_ORDERS.find(x => x.id === oid);
+    if(!o) return;
+    document.getElementById('editOrderId').innerText = oid;
+    document.getElementById('editQty').value = o.qty;
+    document.getElementById('editFelt').value = o.felt;
+    
+    const ov = OVERRIDES[oid] || {};
+    document.getElementById('forceCard').value = ov.card || "";
+    document.getElementById('forceFin').value = ov.fin || "";
+    document.getElementById('forceQC').value = ov.qc || "";
+    
+    document.getElementById('editOrderModal').style.display = 'flex';
+}
+
+function saveOrderEdit() {
+    if(USER_ROLE !== 'admin') return alert('Admin only');
+    const oid = document.getElementById('editOrderId').innerText;
+    const q = parseFloat(document.getElementById('editQty').value);
+    
+    const idx = RAW_ORDERS.findIndex(x => x.id === oid);
+    if(idx > -1) RAW_ORDERS[idx].qty = q;
+    
+    const fc = document.getElementById('forceCard').value;
+    const ff = document.getElementById('forceFin').value;
+    const fq = document.getElementById('forceQC').value;
+    
+    if(fc || ff || fq) {
+        OVERRIDES[oid] = { card: fc, fin: ff, qc: fq };
+    } else {
+        delete OVERRIDES[oid];
+    }
+    
+    document.getElementById('editOrderModal').style.display = 'none';
+    saveLocalState();
+    runEngine();
+}
 
 function initUI() { populateDropdowns(); }
 
@@ -365,7 +515,6 @@ function populateDropdowns() {
         if(!sel) return;
         const isFilter = id.includes('massSeq') || id.includes('force');
         sel.innerHTML = isFilter ? '<option value="">Auto (Engine)</option>' : '';
-        
         CONFIG.machines.forEach(m => sel.innerHTML += `<option value="${m}">${m}</option>`);
     });
 }
@@ -426,10 +575,53 @@ function renderKPIs() {
     document.getElementById('kpiYds').innerText = totYds.toLocaleString();
     document.getElementById('kpiRev').innerText = '$' + (totRev/1000000).toFixed(2) + 'M';
     document.getElementById('kpiLate').innerText = '$' + lateVal.toLocaleString();
-    // Chart rendering logic kept as is...
+    
+    if(CHARTS.load) CHARTS.load.destroy();
+    if(CHARTS.rev) CHARTS.rev.destroy();
+
+    const machLoad = {};
+    const revData = {};
+    SCHEDULE.forEach(r => {
+        const allocs = r.allocations || [r.card, r.fin, r.qc];
+        allocs.forEach(t => {
+            if(t.mach && t.mach!=='Err' && t.mach !== '-') machLoad[t.mach] = (machLoad[t.mach]||0) + r.qty;
+        });
+        const m = new Date(r.globalEnd).toLocaleString('default',{month:'short'});
+        revData[m] = (revData[m]||0) + r.val;
+    });
+
+    CHARTS.load = new Chart(document.getElementById('chartLoad'), {
+        type: 'bar',
+        data: { labels: Object.keys(machLoad), datasets: [{ label: 'Yards', data: Object.values(machLoad), backgroundColor: '#3b82f6' }] },
+        options: { responsive: true, maintainAspectRatio: false }
+    });
+
+    CHARTS.rev = new Chart(document.getElementById('chartRev'), {
+        type: 'line',
+        data: { labels: Object.keys(revData), datasets: [{ label: 'Revenue', data: Object.values(revData), borderColor: '#22c55e', fill: true, backgroundColor:'rgba(34,197,94,0.1)' }] },
+        options: { responsive: true, maintainAspectRatio: false }
+    });
 }
-// Placeholder functions for table rendering to keep file valid if not fully pasted
-function renderRatesTable() { /* same as old */ }
-function renderSequencingTable() { /* same as old */ }
-function renderStaffingTable() { /* same as old */ }
-function renderDowntimeTable() { /* same as old */ }
+function addDowntime() {
+    if(USER_ROLE !== 'admin') return alert('Admin only');
+    const m = document.getElementById('dtMachine').value;
+    const s = document.getElementById('dtStart').value;
+    const e = document.getElementById('dtEnd').value;
+    if (!m || !s || !e) return;
+    DOWNTIME.push({ id: 'temp-'+Date.now(), machine: m, start: new Date(s).getTime(), end: new Date(e).getTime(), reason: 'Planned' });
+    renderDowntimeTable();
+    runEngine();
+}
+function renderDowntimeTable() {
+    const tb = document.getElementById('dtBody');
+    tb.innerHTML = DOWNTIME.map((d, i) => `
+        <tr class="border-b border-slate-100">
+            <td class="p-4 font-bold text-slate-700">${d.machine}</td>
+            <td class="p-4 text-slate-500">${new Date(d.start).toLocaleString()}</td>
+            <td class="p-4 text-slate-500">${new Date(d.end).toLocaleString()}</td>
+            <td class="p-4 text-slate-500 italic">${d.reason}</td>
+            <td class="p-4 text-center"><button class="text-red-500 hover:text-red-700 admin-only" onclick="remDT(${i})"><i class="fa-solid fa-trash"></i></button></td>
+        </tr>
+    `).join('');
+}
+function remDT(i) { DOWNTIME.splice(i, 1); renderDowntimeTable(); runEngine(); }
