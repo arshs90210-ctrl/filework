@@ -372,10 +372,11 @@ function renderAll() {
             
             let type = 'fin';
             const mUp = task.mach.toUpperCase();
-            // IMPROVED VISUAL LOGIC
+            
+            // IMPROVED VISUAL LOGIC: Explicitly identify Carding and QC
             if(mUp.includes('CARD')) type = 'card';
             else if(mUp.includes('QC')) type = 'qc';
-            // Anything else (Bruckner, Singer, Heatset, Dilo) defaults to 'fin' (Purple)
+            // Anything else (Bruckner, Singer, Heatset, Kusters, Perkins, Dilo) falls to 'fin' (purple)
 
             const b = document.createElement('div');
             b.className = `bar bar-${type} ${isForced?'bar-forced':''}`;
