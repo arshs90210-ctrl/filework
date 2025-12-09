@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Alkegen Scheduler v7.0 (Robust)</title>
+  <title>Alkegen Scheduler v7.5 (Deep Logic)</title>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.tailwindcss.com"></script>
@@ -20,7 +20,7 @@
             <i class="fa-solid fa-industry text-white text-2xl"></i>
         </div>
         <h1 class="text-2xl font-bold text-slate-800">Alkegen Scheduler</h1>
-        <p class="text-slate-500 text-sm">Secure Production System v7.0</p>
+        <p class="text-slate-500 text-sm">Secure Production System v7.5</p>
     </div>
     <div class="login-box">
         <div class="space-y-4">
@@ -143,6 +143,9 @@
                     <h2 class="text-2xl font-bold text-slate-800">Dynamic Routing Graph</h2>
                     <p class="text-sm text-slate-500">Priority: First machine listed is preferred. Engine will try first option before falling back.</p>
                 </div>
+                <button onclick="document.getElementById('massRouteModal').style.display='flex'" class="admin-only px-4 py-2 bg-slate-100 border border-slate-300 text-slate-700 font-bold rounded hover:bg-white transition flex items-center gap-2">
+                    <i class="fa-solid fa-bolt"></i> Mass Update Routes
+                </button>
             </div>
             <div class="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
                 <table class="w-full text-sm text-left text-slate-600">
@@ -159,83 +162,65 @@
         </div>
     </div>
 
-    <div id="view-staffing" class="flex-1 hidden bg-white p-8 fade-in overflow-auto">
-        <div class="max-w-5xl mx-auto">
-            <div class="flex justify-between items-end mb-6">
-                <div>
-                    <h2 class="text-2xl font-bold text-slate-800">Machine Staffing</h2>
-                    <p class="text-sm text-slate-500">Unchecked shifts are treated as downtime.</p>
-                </div>
-                <button onclick="runEngine()" class="admin-only px-4 py-2 bg-green-600 text-white font-bold rounded shadow hover:bg-green-700">Apply & Re-Schedule</button>
-            </div>
-            <div class="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
-                <table class="w-full text-sm text-left text-slate-600">
-                    <thead class="bg-slate-50 text-slate-500 font-bold border-b border-slate-200">
-                        <tr>
-                            <th class="p-4">Specific Machine</th>
-                            <th class="p-4 text-center">Day (08:00 - 16:00)</th>
-                            <th class="p-4 text-center">Swing (16:00 - 00:00)</th>
-                            <th class="p-4 text-center">Night (00:00 - 08:00)</th>
-                        </tr>
-                    </thead>
-                    <tbody id="staffingTableBody" class="divide-y divide-slate-100"></tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-
-    <div id="view-rates" class="flex-1 hidden bg-white p-8 fade-in overflow-auto">
-        <div class="max-w-6xl mx-auto">
-            <div class="flex justify-between items-end mb-6">
-                <h2 class="text-2xl font-bold text-slate-800">Rates & Changeovers</h2>
-                <div class="flex gap-3 admin-only">
-                     <div class="bg-slate-50 p-2 rounded-lg border border-slate-200 flex items-center gap-3">
-                        <span class="text-xs font-bold text-slate-500 uppercase ml-2">Setup Penalty</span>
-                        <input type="number" id="setupPenalty" value="4" class="w-16 bg-white border border-slate-300 text-slate-700 rounded px-2 py-1 text-center font-mono text-sm" onchange="runEngine()">
-                        <span class="text-xs text-slate-500 mr-2">hours</span>
-                    </div>
-                    <button onclick="document.getElementById('massRateModal').style.display='flex'" class="px-4 py-2 bg-slate-100 border border-slate-300 text-slate-700 font-bold rounded hover:bg-white transition">Mass Update</button>
-                    <button onclick="addNewRateRow()" class="px-4 py-2 bg-blue-600 text-white font-bold rounded shadow hover:bg-blue-700">+ Add Rate</button>
-                </div>
-            </div>
-            <div class="bg-white rounded-lg border border-slate-200 overflow-hidden shadow-sm">
-                <table class="w-full text-sm text-left text-slate-600">
-                    <thead class="bg-slate-50 text-slate-500 font-bold border-b border-slate-200">
-                        <tr>
-                            <th class="p-4 w-1/3">Felt Code</th>
-                            <th class="p-4 text-right">Carding (yds/hr)</th>
-                            <th class="p-4 text-right">Finishing (yds/hr)</th>
-                            <th class="p-4 text-right">QC (yds/hr)</th>
-                            <th class="p-4 w-20 text-center">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="ratesTableBody" class="divide-y divide-slate-100"></tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-
     <div id="view-kpi" class="flex-1 hidden bg-white p-8 fade-in overflow-auto">
         <div class="max-w-7xl mx-auto space-y-8">
-            <h2 class="text-2xl font-bold text-slate-800">Operational Analytics</h2>
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
-                <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm"><div class="text-xs font-bold text-slate-400 uppercase">Throughput</div><div class="text-3xl font-bold text-slate-800 mt-2" id="kpiYds">0</div></div>
-                <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm"><div class="text-xs font-bold text-slate-400 uppercase">Revenue</div><div class="text-3xl font-bold text-green-600 mt-2" id="kpiRev">$0</div></div>
-                <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm"><div class="text-xs font-bold text-slate-400 uppercase">Late Value</div><div class="text-3xl font-bold text-red-600 mt-2" id="kpiLate">$0</div></div>
+            <div class="flex justify-between items-center">
+                <h2 class="text-2xl font-bold text-slate-800">Operational Financials</h2>
+                <div class="text-xs text-slate-400">Real-time projection based on Schedule</div>
             </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden group">
+                    <div class="text-xs font-bold text-slate-400 uppercase tracking-wide">Throughput (Yds)</div>
+                    <div class="text-3xl font-bold text-slate-800 mt-2" id="kpiYds">0</div>
+                    <div class="absolute right-4 top-6 text-slate-100 text-5xl group-hover:scale-110 transition opacity-50"><i class="fa-solid fa-ruler-horizontal"></i></div>
+                </div>
+                <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden">
+                    <div class="text-xs font-bold text-slate-400 uppercase tracking-wide">Projected Revenue</div>
+                    <div class="text-3xl font-bold text-green-600 mt-2" id="kpiRev">$0</div>
+                    <div class="absolute right-4 top-6 text-green-50 text-5xl opacity-50"><i class="fa-solid fa-sack-dollar"></i></div>
+                </div>
+                <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden">
+                    <div class="text-xs font-bold text-slate-400 uppercase tracking-wide">Std Absorption</div>
+                    <div class="text-3xl font-bold text-blue-600 mt-2" id="kpiAbs">$0</div>
+                    <div class="text-[10px] text-blue-400 mt-1">Overhead Recovery</div>
+                    <div class="absolute right-4 top-6 text-blue-50 text-5xl opacity-50"><i class="fa-solid fa-industry"></i></div>
+                </div>
+                <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden">
+                    <div class="text-xs font-bold text-slate-400 uppercase tracking-wide">Late Revenue Risk</div>
+                    <div class="text-3xl font-bold text-red-600 mt-2" id="kpiLate">$0</div>
+                    <div class="absolute right-4 top-6 text-red-50 text-5xl opacity-50"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                </div>
+            </div>
+
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 h-96">
                 <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col">
                     <h3 class="text-sm font-bold text-slate-600 mb-6">Machine Load Balance</h3>
                     <div class="flex-grow relative"><canvas id="chartLoad"></canvas></div>
                 </div>
                 <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col">
-                    <h3 class="text-sm font-bold text-slate-600 mb-6">Revenue Forecast</h3>
+                    <h3 class="text-sm font-bold text-slate-600 mb-6">Financial Forecast (Sales vs Absorption)</h3>
                     <div class="flex-grow relative"><canvas id="chartRev"></canvas></div>
                 </div>
             </div>
         </div>
     </div>
 
+    <div id="view-staffing" class="flex-1 hidden bg-white p-8 fade-in overflow-auto">
+        <div class="max-w-5xl mx-auto">
+            <div class="flex justify-between items-end mb-6">
+                <div><h2 class="text-2xl font-bold text-slate-800">Machine Staffing</h2><p class="text-sm text-slate-500">Unchecked shifts are treated as downtime.</p></div>
+                <button onclick="runEngine()" class="admin-only px-4 py-2 bg-green-600 text-white font-bold rounded shadow hover:bg-green-700">Apply & Re-Schedule</button>
+            </div>
+            <div class="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden"><table class="w-full text-sm text-left text-slate-600"><thead class="bg-slate-50 text-slate-500 font-bold border-b border-slate-200"><tr><th class="p-4">Specific Machine</th><th class="p-4 text-center">Day (08:00 - 16:00)</th><th class="p-4 text-center">Swing (16:00 - 00:00)</th><th class="p-4 text-center">Night (00:00 - 08:00)</th></tr></thead><tbody id="staffingTableBody" class="divide-y divide-slate-100"></tbody></table></div>
+        </div>
+    </div>
+    <div id="view-rates" class="flex-1 hidden bg-white p-8 fade-in overflow-auto">
+        <div class="max-w-6xl mx-auto">
+            <div class="flex justify-between items-end mb-6"><h2 class="text-2xl font-bold text-slate-800">Rates & Changeovers</h2><div class="flex gap-3 admin-only"><button onclick="document.getElementById('massRateModal').style.display='flex'" class="px-4 py-2 bg-slate-100 border border-slate-300 text-slate-700 font-bold rounded hover:bg-white transition">Mass Update</button><button onclick="addNewRateRow()" class="px-4 py-2 bg-blue-600 text-white font-bold rounded shadow hover:bg-blue-700">+ Add Rate</button></div></div>
+            <div class="bg-white rounded-lg border border-slate-200 overflow-hidden shadow-sm"><table class="w-full text-sm text-left text-slate-600"><thead class="bg-slate-50 text-slate-500 font-bold border-b border-slate-200"><tr><th class="p-4 w-1/3">Felt Code</th><th class="p-4 text-right">Carding (yds/hr)</th><th class="p-4 text-right">Finishing (yds/hr)</th><th class="p-4 text-right">QC (yds/hr)</th><th class="p-4 w-20 text-center">Actions</th></tr></thead><tbody id="ratesTableBody" class="divide-y divide-slate-100"></tbody></table></div>
+        </div>
+    </div>
     <div id="view-downtime" class="flex-1 hidden bg-white p-8 fade-in overflow-auto">
          <div class="max-w-4xl mx-auto">
             <h2 class="text-2xl font-bold text-slate-800 mb-6">Planned Downtime</h2>
@@ -245,9 +230,7 @@
                 <input type="datetime-local" id="dtEnd" class="w-full bg-slate-50 border border-slate-300 rounded p-2 text-sm">
                 <button onclick="addDowntime()" class="bg-red-600 text-white font-bold py-2 rounded text-sm shadow">Add Block</button>
             </div>
-            <div class="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
-                <table class="w-full text-sm text-left text-slate-600"><tbody id="dtBody" class="divide-y divide-slate-100"></tbody></table>
-            </div>
+            <div class="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm"><table class="w-full text-sm text-left text-slate-600"><tbody id="dtBody" class="divide-y divide-slate-100"></tbody></table></div>
         </div>
     </div>
 </div>
@@ -257,107 +240,44 @@
         <h2 class="text-xl font-bold mb-6 text-slate-800 border-b border-slate-200 pb-2">Import Data</h2>
         <div class="space-y-4">
             <div class="border border-dashed border-slate-300 rounded-lg p-6 hover:bg-slate-50 transition cursor-pointer relative text-center group">
-                <div class="font-bold text-slate-700">1. Load Rates</div>
-                <div class="text-xs text-slate-500" id="rateStatus">Rates.xlsx</div>
-                <input type="file" class="absolute inset-0 opacity-0 cursor-pointer" onchange="handleRateUpload(this)">
+                <div class="font-bold text-slate-700">1. Load Rates</div><div class="text-xs text-slate-500" id="rateStatus">Rates.xlsx</div><input type="file" class="absolute inset-0 opacity-0 cursor-pointer" onchange="handleRateUpload(this)">
             </div>
             <div class="border border-dashed border-slate-300 rounded-lg p-6 hover:bg-slate-50 transition cursor-pointer relative text-center group">
-                <div class="font-bold text-slate-700">2. Load Orders</div>
-                <div class="text-xs text-slate-500" id="orderStatus">Open Orders.xlsx</div>
-                <input type="file" class="absolute inset-0 opacity-0 cursor-pointer" onchange="handleOrderUpload(this)">
+                <div class="font-bold text-slate-700">2. Load Orders</div><div class="text-xs text-slate-500" id="orderStatus">Open Orders.xlsx</div><input type="file" class="absolute inset-0 opacity-0 cursor-pointer" onchange="handleOrderUpload(this)">
             </div>
             <div class="border border-dashed border-slate-300 rounded-lg p-6 hover:bg-slate-50 transition cursor-pointer relative text-center group">
-                <div class="font-bold text-slate-700">3. Load Digital Schedule</div>
-                <div class="text-xs text-slate-500" id="routeStatus">Digital Schedule.xlsx</div>
-                <input type="file" class="absolute inset-0 opacity-0 cursor-pointer" onchange="handleRouteUpload(this)">
+                <div class="font-bold text-slate-700">3. Load Digital Schedule</div><div class="text-xs text-slate-500" id="routeStatus">Digital Schedule.xlsx</div><input type="file" class="absolute inset-0 opacity-0 cursor-pointer" onchange="handleRouteUpload(this)">
             </div>
         </div>
-        <div class="flex justify-end gap-3 mt-8">
-            <button onclick="document.getElementById('uploadModal').style.display='none'" class="px-4 py-2 text-slate-500 font-bold text-sm">Cancel</button>
-            <button onclick="runEngine()" class="px-6 py-2 bg-blue-600 text-white font-bold rounded-lg shadow-lg">Initialize</button>
-        </div>
+        <div class="flex justify-end gap-3 mt-8"><button onclick="document.getElementById('uploadModal').style.display='none'" class="px-4 py-2 text-slate-500 font-bold text-sm">Cancel</button><button onclick="runEngine()" class="px-6 py-2 bg-blue-600 text-white font-bold rounded-lg shadow-lg">Initialize</button></div>
     </div>
 </div>
 
-<div id="editRouteModal" class="modal-bg">
-    <div class="modal-content w-[600px]">
-        <h2 class="text-lg font-bold text-slate-800 mb-4">Edit Routing: <span id="editRouteFelt" class="text-blue-600"></span></h2>
-        <div class="mb-4">
-            <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Define Flow</label>
-            <p class="text-xs text-slate-400 mb-2">Comma separated steps. Use "/" for options. First option is preferred.<br>Ex: <code>Card 1/Card 2, Bruckner 1, QC 1</code></p>
-            <textarea id="editRouteString" class="w-full bg-slate-50 border border-slate-300 rounded p-3 text-sm font-mono h-32"></textarea>
-        </div>
-        <div class="flex justify-end gap-3">
-            <button onclick="document.getElementById('editRouteModal').style.display='none'" class="px-4 py-2 text-slate-500 font-bold text-sm">Cancel</button>
-            <button onclick="saveRouteEdit()" class="admin-only px-4 py-2 bg-blue-600 text-white font-bold rounded shadow hover:bg-blue-700">Save</button>
-        </div>
-    </div>
-</div>
-
-<div id="editOrderModal" class="modal-bg">
+<div id="massRouteModal" class="modal-bg">
     <div class="modal-content w-[500px]">
-        <h2 class="text-lg font-bold text-slate-800 mb-4">Edit Order <span id="editOrderId" class="text-blue-600"></span></h2>
-        <div class="grid grid-cols-2 gap-4 mb-4">
-            <div>
-                <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Balance (Qty)</label>
-                <input type="number" id="editQty" class="w-full bg-white border border-slate-300 text-slate-800 rounded p-2 text-sm">
-            </div>
-            <div>
-                <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Felt Code</label>
-                <input type="text" id="editFelt" class="w-full bg-gray-100 border border-slate-300 text-slate-600 rounded p-2 text-sm" readonly>
-            </div>
-        </div>
-        <div class="border-t border-slate-200 pt-4 mb-4">
-            <h3 class="text-xs font-bold text-slate-800 mb-2 uppercase">Force Specific Machines</h3>
-            <div class="grid grid-cols-3 gap-3">
-                <div><label class="block text-[10px] font-bold text-slate-500 mb-1">Carding</label><select id="forceCard" class="w-full bg-white border border-slate-300 rounded p-2 text-xs"><option value="">Auto</option></select></div>
-                <div><label class="block text-[10px] font-bold text-slate-500 mb-1">Finishing</label><select id="forceFin" class="w-full bg-white border border-slate-300 rounded p-2 text-xs"><option value="">Auto</option></select></div>
-                <div><label class="block text-[10px] font-bold text-slate-500 mb-1">QC</label><select id="forceQC" class="w-full bg-white border border-slate-300 rounded p-2 text-xs"><option value="">Auto</option></select></div>
-            </div>
-        </div>
-        <div class="mt-6 flex justify-end gap-3">
-            <button onclick="document.getElementById('editOrderModal').style.display='none'" class="px-4 py-2 text-slate-500 font-bold text-sm">Cancel</button>
-            <button onclick="saveOrderEdit()" class="admin-only px-4 py-2 bg-blue-600 text-white font-bold rounded shadow hover:bg-blue-700">Save & Re-Run</button>
-        </div>
-    </div>
-</div>
-
-<div id="editRateModal" class="modal-bg">
-    <div class="modal-content w-[400px]">
-        <h2 class="text-lg font-bold text-slate-800 mb-4">Edit Rate: <span id="editRateFelt" class="text-blue-600"></span></h2>
-        <div class="grid grid-cols-3 gap-3 mb-4">
-            <div><label class="text-[10px] font-bold text-slate-500">Card</label><input type="number" id="editRateCard" class="w-full border rounded p-2 text-sm"></div>
-            <div><label class="text-[10px] font-bold text-slate-500">Finishing</label><input type="number" id="editRateFin" class="w-full border rounded p-2 text-sm"></div>
-            <div><label class="text-[10px] font-bold text-slate-500">QC</label><input type="number" id="editRateQC" class="w-full border rounded p-2 text-sm"></div>
-        </div>
-        <div class="flex justify-end gap-3">
-            <button onclick="document.getElementById('editRateModal').style.display='none'" class="px-4 py-2 text-slate-500 text-sm font-bold">Cancel</button>
-            <button onclick="saveRateEdit()" class="admin-only px-4 py-2 bg-blue-600 text-white text-sm font-bold rounded">Save</button>
-        </div>
-    </div>
-</div>
-
-<div id="massRateModal" class="modal-bg">
-    <div class="modal-content w-[400px]">
-        <h2 class="text-lg font-bold text-slate-800 mb-4">Mass Update Rates</h2>
+        <h2 class="text-lg font-bold text-slate-800 mb-4">Mass Update Routes</h2>
         <div class="space-y-4">
             <div>
                 <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Felt Code Contains</label>
-                <input type="text" id="massRateFilter" class="w-full bg-white border border-slate-300 rounded p-2 text-sm" placeholder="e.g. AX-14">
+                <input type="text" id="massRouteFilter" class="w-full bg-white border border-slate-300 rounded p-2 text-sm" placeholder="e.g. AX-14">
             </div>
-            <div class="grid grid-cols-3 gap-2">
-                <div><label class="text-[10px]">Card Rate</label><input type="number" id="massRateCard" class="w-full border rounded p-1"></div>
-                <div><label class="text-[10px]">Fin Rate</label><input type="number" id="massRateFin" class="w-full border rounded p-1"></div>
-                <div><label class="text-[10px]">QC Rate</label><input type="number" id="massRateQC" class="w-full border rounded p-1"></div>
+            <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Set New Route String</label>
+                <p class="text-xs text-slate-400 mb-2">Example: <code>Card 2/Card 3, Bruckner 1, QC 2</code></p>
+                <textarea id="massRouteString" class="w-full bg-slate-50 border border-slate-300 rounded p-2 text-sm h-24 font-mono"></textarea>
             </div>
         </div>
         <div class="mt-6 flex justify-end gap-3">
-            <button onclick="document.getElementById('massRateModal').style.display='none'" class="px-4 py-2 text-slate-500 font-bold text-sm">Cancel</button>
-            <button onclick="applyMassRate()" class="admin-only px-4 py-2 bg-blue-600 text-white font-bold rounded">Apply</button>
+            <button onclick="document.getElementById('massRouteModal').style.display='none'" class="px-4 py-2 text-slate-500 font-bold text-sm">Cancel</button>
+            <button onclick="applyMassRoute()" class="admin-only px-4 py-2 bg-purple-600 text-white font-bold rounded shadow hover:bg-purple-700">Apply to All Matches</button>
         </div>
     </div>
 </div>
 
+<div id="editRouteModal" class="modal-bg"><div class="modal-content w-[600px]"><h2 class="text-lg font-bold text-slate-800 mb-4">Edit Routing: <span id="editRouteFelt" class="text-blue-600"></span></h2><div class="mb-4"><label class="block text-xs font-bold text-slate-500 uppercase mb-2">Define Flow</label><textarea id="editRouteString" class="w-full bg-slate-50 border border-slate-300 rounded p-3 text-sm font-mono h-32"></textarea></div><div class="flex justify-end gap-3"><button onclick="document.getElementById('editRouteModal').style.display='none'" class="px-4 py-2 text-slate-500 font-bold text-sm">Cancel</button><button onclick="saveRouteEdit()" class="admin-only px-4 py-2 bg-blue-600 text-white font-bold rounded shadow hover:bg-blue-700">Save</button></div></div></div>
+<div id="editOrderModal" class="modal-bg"><div class="modal-content w-[500px]"><h2 class="text-lg font-bold text-slate-800 mb-4">Edit Order <span id="editOrderId" class="text-blue-600"></span></h2><div class="grid grid-cols-2 gap-4 mb-4"><div><label class="block text-xs font-bold text-slate-500 uppercase mb-1">Balance (Qty)</label><input type="number" id="editQty" class="w-full bg-white border border-slate-300 text-slate-800 rounded p-2 text-sm"></div><div><label class="block text-xs font-bold text-slate-500 uppercase mb-1">Felt Code</label><input type="text" id="editFelt" class="w-full bg-gray-100 border border-slate-300 text-slate-600 rounded p-2 text-sm" readonly></div></div><div class="border-t border-slate-200 pt-4 mb-4"><h3 class="text-xs font-bold text-slate-800 mb-2 uppercase">Force Specific Machines</h3><div class="grid grid-cols-3 gap-3"><div><label class="block text-[10px] font-bold text-slate-500 mb-1">Carding</label><select id="forceCard" class="w-full bg-white border border-slate-300 rounded p-2 text-xs"><option value="">Auto</option></select></div><div><label class="block text-[10px] font-bold text-slate-500 mb-1">Finishing</label><select id="forceFin" class="w-full bg-white border border-slate-300 rounded p-2 text-xs"><option value="">Auto</option></select></div><div><label class="block text-[10px] font-bold text-slate-500 mb-1">QC</label><select id="forceQC" class="w-full bg-white border border-slate-300 rounded p-2 text-xs"><option value="">Auto</option></select></div></div></div><div class="mt-6 flex justify-end gap-3"><button onclick="document.getElementById('editOrderModal').style.display='none'" class="px-4 py-2 text-slate-500 font-bold text-sm">Cancel</button><button onclick="saveOrderEdit()" class="admin-only px-4 py-2 bg-blue-600 text-white font-bold rounded shadow hover:bg-blue-700">Save & Re-Run</button></div></div></div>
+<div id="editRateModal" class="modal-bg"><div class="modal-content w-[400px]"><h2 class="text-lg font-bold text-slate-800 mb-4">Edit Rate: <span id="editRateFelt" class="text-blue-600"></span></h2><div class="grid grid-cols-3 gap-3 mb-4"><div><label class="text-[10px] font-bold text-slate-500">Card</label><input type="number" id="editRateCard" class="w-full border rounded p-2 text-sm"></div><div><label class="text-[10px] font-bold text-slate-500">Finishing</label><input type="number" id="editRateFin" class="w-full border rounded p-2 text-sm"></div><div><label class="text-[10px] font-bold text-slate-500">QC</label><input type="number" id="editRateQC" class="w-full border rounded p-2 text-sm"></div></div><div class="flex justify-end gap-3"><button onclick="document.getElementById('editRateModal').style.display='none'" class="px-4 py-2 text-slate-500 text-sm font-bold">Cancel</button><button onclick="saveRateEdit()" class="admin-only px-4 py-2 bg-blue-600 text-white text-sm font-bold rounded">Save</button></div></div></div>
+<div id="massRateModal" class="modal-bg"><div class="modal-content w-[400px]"><h2 class="text-lg font-bold text-slate-800 mb-4">Mass Update Rates</h2><div class="space-y-4"><div><label class="block text-xs font-bold text-slate-500 uppercase mb-1">Felt Code Contains</label><input type="text" id="massRateFilter" class="w-full bg-white border border-slate-300 rounded p-2 text-sm" placeholder="e.g. AX-14"></div><div class="grid grid-cols-3 gap-2"><div><label class="text-[10px]">Card Rate</label><input type="number" id="massRateCard" class="w-full border rounded p-1"></div><div><label class="text-[10px]">Fin Rate</label><input type="number" id="massRateFin" class="w-full border rounded p-1"></div><div><label class="text-[10px]">QC Rate</label><input type="number" id="massRateQC" class="w-full border rounded p-1"></div></div></div><div class="mt-6 flex justify-end gap-3"><button onclick="document.getElementById('massRateModal').style.display='none'" class="px-4 py-2 text-slate-500 font-bold text-sm">Cancel</button><button onclick="applyMassRate()" class="admin-only px-4 py-2 bg-blue-600 text-white font-bold rounded">Apply</button></div></div></div>
 <div id="tooltip" class="tooltip"></div>
 
 <script id="worker-script" type="text/plain">
@@ -368,9 +288,11 @@
         let schedule = [];
         let now = simStart || new Date().getTime();
         let machineState = {};
-        let activeDowntime = [...downtime];
+        // Flatten downtime for easier lookups
+        // Sort downtimes by start time
+        let activeDowntime = [...downtime].sort((a,b) => a.start - b.start);
 
-        // 0. MATRIX CHANGEOVER LOGIC (v6.0 Improvement)
+        // 0. MATRIX CHANGEOVER LOGIC
         const FIBER_MATRIX = {
             'POLYESTER': { 'ARAMID': 8, 'PPS': 4 },
             'ARAMID': { 'POLYESTER': 12, 'PPS': 6 },
@@ -386,18 +308,25 @@
             return 4 * 3600000;
         }
 
-        // 1. STAFFING DOWNTIME
-        for(let d=0; d<60; d++) {
+        // 1. STAFFING DOWNTIME (Dynamic Generation)
+        // Generate downtime for 90 days out to be safe
+        for(let d=0; d<90; d++) {
             const dayStart = now + (d * 86400000);
             const midnight = new Date(dayStart).setHours(0,0,0,0);
             Object.keys(staffing).forEach(machName => {
                 const avail = staffing[machName];
                 if(!avail) return;
+                // Shift 1 (08-16), Shift 2 (16-24), Shift 3 (00-08)
+                // If Shift 1 unchecked: downtime 08:00 to 16:00
                 if(!avail[0]) activeDowntime.push({ machine: machName, start: midnight + (8*3600000), end: midnight + (16*3600000), reason: 'Staffing' });
+                // If Shift 2 unchecked: downtime 16:00 to 24:00
                 if(!avail[1]) activeDowntime.push({ machine: machName, start: midnight + (16*3600000), end: midnight + (24*3600000), reason: 'Staffing' });
+                // If Shift 3 unchecked: downtime 00:00 to 08:00
                 if(!avail[2]) activeDowntime.push({ machine: machName, start: midnight, end: midnight + (8*3600000), reason: 'Staffing' });
             });
         }
+        // Re-sort after adding staffing
+        activeDowntime.sort((a,b) => a.start - b.start);
 
         MACHINES.forEach(m => { machineState[m] = { time: now, lastFelt: null, lastFiber: null }; });
 
@@ -420,13 +349,11 @@
             const r = rates[ord.felt] || Object.values(rates)[0] || {card:250, finish:700, qc:400};
             let statusUpper = (ord.status || '').toUpperCase();
             
-            // Raw Material Constraint (v6.0)
             let materialReadyTime = now;
             if (statusUpper.includes('WAITING RAW') || statusUpper.includes('MATERIAL')) {
                 materialReadyTime = now + (7 * 86400000);
             }
 
-            // Routing
             let routeSteps = routes[ord.felt];
             if (!routeSteps || routeSteps.length === 0) {
                  routeSteps = [
@@ -436,7 +363,6 @@
                  ];
             }
 
-            // WIP Netting (v6.0)
             let startStepIndex = 0;
             let currentReady = materialReadyTime;
             let wipQty = ord.wip || 0;
@@ -458,9 +384,7 @@
 
             for(let i = startStepIndex; i < routeSteps.length; i++) {
                 const step = routeSteps[i];
-                let pool = step.pool; // This pool is ORDERED by preference (index 0 is best)
-                
-                // Rate Lookup
+                let pool = step.pool;
                 let stepRate = 500; 
                 const poolStr = pool.join(' ').toUpperCase();
                 if(poolStr.includes('CARD')) stepRate = r.card || 250;
@@ -476,7 +400,6 @@
                     else currentReady += 3600000;
                 }
 
-                // Force Override from UI
                 if(overrides[ord.id]) {
                      if(overrides[ord.id].card && poolStr.includes('CARD')) pool = [overrides[ord.id].card];
                      if(overrides[ord.id].fin && !poolStr.includes('CARD') && !poolStr.includes('QC')) pool = [overrides[ord.id].fin];
@@ -484,7 +407,10 @@
                 }
 
                 let forceParams = (i === startStepIndex) ? forcedFirstStep : null;
+                
+                // --- CALL ALLOCATE ---
                 const res = allocate(pool, currentReady, stepDurHrs, ord.felt, ord.fiber, forceParams);
+                
                 allocations.push({ stepName: step.step, ...res });
                 currentReady = res.end;
             }
@@ -498,17 +424,22 @@
             });
         });
 
-        // Allocation with PREFERENCE Logic
+        // ----------------------------------------------------
+        //  CORE ALLOCATION LOGIC (Shift-Aware & Downtime-Aware)
+        // ----------------------------------------------------
         function allocate(pool, readyTime, durHrs, felt, fiber, forceParams) {
             if(!pool || pool.length === 0) return { mach:'Err', start:readyTime, end:readyTime };
+            
             const durMs = durHrs * 3600000;
-            // PATIENCE: How long to wait for preferred machine (Index 0)
-            const PATIENCE_THRESHOLD = 24 * 3600000; 
+            const PATIENCE_THRESHOLD = 24 * 3600000;
 
             if (forceParams) {
+                // If forced, we assume it's already running. 
+                // We calculate finish time based on remaining duration, respecting downtimes starting NOW.
                 const mName = pool[0]; 
                 const start = forceParams.startAt;
-                const end = start + durMs;
+                const end = calculateFinishTime(mName, start, durMs);
+                
                 if(!machineState[mName]) machineState[mName] = { time: now, lastFelt: null, lastFiber: null };
                 machineState[mName].time = end;
                 machineState[mName].lastFelt = felt;
@@ -516,56 +447,49 @@
                 return { mach: mName, start: start, end: end };
             }
 
+            // Calculate 'Available to Finish' for each machine in pool
             let options = pool.map(mName => {
-                // QC LAB LOGIC: Super fast, infinite capacity (no downtime check)
                 if (mName.toUpperCase().includes('LAB')) {
-                     const labRateMult = 10; // 10x speed or capacity
+                     const labRateMult = 10; 
                      const labDur = durMs / labRateMult;
-                     // Lab is always available now or at readyTime
                      return { mach: mName, start: Math.max(readyTime, now), end: Math.max(readyTime, now) + labDur };
                 }
 
                 const mState = machineState[mName] || { time: now, lastFelt: null, lastFiber: null };
+                
+                // 1. Determine Earliest Start Time (Setup included)
                 let start = Math.max(mState.time, readyTime, now);
                 
-                // Matrix Changeover
                 if(mState.lastFelt) {
                     if (mState.lastFelt === felt) { start += 0; } 
                     else { start += getChangeoverDuration(mState.lastFiber, fiber); }
                 }
 
-                // Downtime Check
-                let conflict = true;
-                let attempts = 0;
-                while(conflict && attempts < 50) {
-                    conflict = false;
-                    const potentialEnd = start + durMs;
-                    const dt = activeDowntime.find(d => d.machine === mName && d.start < potentialEnd && d.end > start);
-                    if (dt) { start = dt.end; conflict = true; }
-                    attempts++;
-                }
-                return { mach: mName, start: start, end: start + durMs };
+                // 2. Find Next Available Slot (Jumping over immediate downtime)
+                // If 'start' lands exactly inside a downtime block, push it out.
+                // NOTE: calculateFinishTime handles interrupts, but we need a valid start first.
+                start = findNextValidStart(mName, start);
+
+                // 3. Calculate Finish Time (Walking through downtimes)
+                const end = calculateFinishTime(mName, start, durMs);
+
+                return { mach: mName, start: start, end: end };
             });
 
-            // PREFERENCE LOGIC:
-            // pool[0] is the Preferred Machine. options[0] corresponds to it.
-            // If options[0] is available reasonably soon, take it.
+            // PREFERENCE LOGIC
             const preferredOption = options[0];
             const bestPossibleTime = Math.min(...options.map(o => o.end));
             
             let selectedOption = null;
-
-            // If preferred machine finishes within 24hrs of the "absolute best possible time", take it.
             if (preferredOption.end <= (bestPossibleTime + PATIENCE_THRESHOLD)) {
                 selectedOption = preferredOption;
             } else {
-                // Otherwise, find the fastest one
                 selectedOption = options.reduce((prev, curr) => prev.end < curr.end ? prev : curr);
             }
 
             const mName = selectedOption.mach;
             if(!machineState[mName]) machineState[mName] = { time: now, lastFelt: null, lastFiber: null };
-            // Update machine state only if it's not the Lab (simulating infinite capacity)
+            
             if (!mName.toUpperCase().includes('LAB')) {
                  machineState[mName].time = selectedOption.end;
                  machineState[mName].lastFelt = felt;
@@ -573,6 +497,63 @@
             }
             
             return selectedOption;
+        }
+
+        // Helper: Find first moment 'start' is not inside a downtime block
+        function findNextValidStart(machine, proposedStart) {
+            let t = proposedStart;
+            // Filter downtimes for this machine
+            const machineDT = activeDowntime.filter(d => d.machine === machine);
+            
+            let inConflict = true;
+            while(inConflict) {
+                inConflict = false;
+                for(let dt of machineDT) {
+                    // If t is inside a block
+                    if(t >= dt.start && t < dt.end) {
+                        t = dt.end; // Jump to end of block
+                        inConflict = true; // Re-check in case we landed in *another* block
+                        break; 
+                    }
+                }
+            }
+            return t;
+        }
+
+        // Helper: Calculate finish time by "burning" duration only during valid windows
+        function calculateFinishTime(machine, startTime, durationMs) {
+            let remaining = durationMs;
+            let current = startTime;
+            
+            // Optimization: Filter relevant downtimes ahead of start
+            const machineDT = activeDowntime.filter(d => d.machine === machine && d.end > startTime);
+
+            // We iterate until duration is consumed. 
+            // Safety break to prevent infinite loops if config is bad
+            let loops = 0;
+            while(remaining > 0 && loops < 1000) {
+                // Find next downtime block that starts after 'current'
+                const nextDT = machineDT.find(d => d.start > current); // Assumes sorted
+                
+                if (!nextDT) {
+                    // No more downtimes ever? Just finish it.
+                    return current + remaining;
+                }
+
+                // Time until next downtime
+                const timeToDT = nextDT.start - current;
+
+                if (timeToDT >= remaining) {
+                    // We can finish before the next downtime hits
+                    return current + remaining;
+                } else {
+                    // We run until the downtime hits
+                    remaining -= timeToDT;
+                    current = nextDT.end; // Jump clock to end of downtime
+                }
+                loops++;
+            }
+            return current + remaining;
         }
 
         let dayLoads = {};
